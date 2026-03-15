@@ -1,6 +1,6 @@
 # finfeatures
 
-[![CI](https://github.com/your-org/finfeatures/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/finfeatures/actions/workflows/ci.yml)
+[![CI](https://github.com/whitham-powell/finfeatures/actions/workflows/ci.yml/badge.svg)](https://github.com/whitham-powell/finfeatures/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -49,10 +49,10 @@ uv add "finfeatures[yfinance]"
 uv add finfeatures
 
 # From GitHub main
-uv add "finfeatures @ git+https://github.com/your-org/finfeatures"
+uv add "finfeatures @ git+https://github.com/whitham-powell/finfeatures"
 
 # From a specific tag / commit
-uv add "finfeatures @ git+https://github.com/your-org/finfeatures@v0.1.0"
+uv add "finfeatures @ git+https://github.com/whitham-powell/finfeatures@v0.1.0"
 
 # Local editable (development of finfeatures itself)
 uv add --editable ./finfeatures
@@ -250,7 +250,7 @@ finfeatures/
 
 ```bash
 # Clone and set up
-git clone https://github.com/your-org/finfeatures
+git clone https://github.com/whitham-powell/finfeatures
 cd finfeatures
 uv sync                         # installs all dev deps, creates .venv
 
