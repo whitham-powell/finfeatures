@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# uv / virtualenvs
+.venv/
+venv/
+.uv/
+
+# uv lock (commit this in applications, not libraries)
+# uv.lock is intentionally NOT listed here — we commit it for reproducible CI
+# but downstream consumers resolve their own lock.
+
+# Type checking
+.mypy_cache/
+.ruff_cache/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribution
+*.whl
+*.tar.gz
+MANIFEST

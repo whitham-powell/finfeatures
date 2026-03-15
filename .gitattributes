@@ -1,0 +1,8 @@
+# Normalise line endings to LF on commit across all platforms
+* text=auto eol=lf
+
+# Explicitly declare binary files so git never tries to diff/merge them
+*.png  binary
+*.jpg  binary
+*.whl  binary
+*.gz   binary
