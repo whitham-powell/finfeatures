@@ -159,7 +159,7 @@ def minimal_pipeline() -> FeaturePipeline:
 def standard_pipeline() -> FeaturePipeline:
     """
     A comprehensive baseline covering returns, vol, trend and momentum.
-    Safe default for regime detection and backtesting inputs.
+    Safe default for general feature engineering.
     """
     from finfeatures.features.momentum import RSI, RateOfChange
     from finfeatures.features.price import LogReturns, PriceRange, Returns, TypicalPrice
@@ -201,32 +201,35 @@ def standard_pipeline() -> FeaturePipeline:
     )
 
 
-def regime_pipeline() -> FeaturePipeline:
+def extended_pipeline() -> FeaturePipeline:
     """
-    Extended pipeline with distributional and structural features useful as
-    inputs to regime detectors (HMM, iHMM, BOCPD, threshold classifiers, etc.).
-    Superset of standard_pipeline.
+    Extended pipeline with distributional and structural features.
+    Superset of standard_pipeline — adds log-space transforms, multi-horizon
+    volatility, distribution shift scores, drawdown features, and composite
+    scores.
+
+    Useful as inputs to regime detectors, risk models, ML classifiers, etc.
 
     Note: algorithm-specific features (e.g. RollingMMD, BOCPD run-length
-    posterior) are NOT included here — they belong in your detection project.
+    posterior) are NOT included here — they belong in your downstream project.
     Extend this pipeline there:
 
-        from finfeatures import regime_pipeline
-        from mmd_regime.features import RollingMMD
+        from finfeatures import extended_pipeline
+        from my_project.features import RollingMMD
 
-        pipeline = regime_pipeline().add(RollingMMD(window=63))
+        pipeline = extended_pipeline().add(RollingMMD(window=63))
         enriched = pipeline.transform(raw)
     """
+    from finfeatures.features.composite import (
+        CompositeScores,
+        DistributionShiftScore,
+        DrawdownFeatures,
+    )
     from finfeatures.features.price import (
         CandleShape,
         CrossDay,
         LogTransform,
         ShapeDynamics,
-    )
-    from finfeatures.features.regime import (
-        DistributionShiftScore,
-        DrawdownFeatures,
-        RegimeIndicators,
     )
     from finfeatures.features.statistical import (
         RollingSkewKurt,
@@ -248,10 +251,10 @@ def regime_pipeline() -> FeaturePipeline:
         RollingVolatility(window=90, annualize=False),
         # Moving true range
         MovingTrueRange(windows=[20, 50, 200]),
-        # Statistical & regime
+        # Statistical & composite
         RollingZScore(column="realized_vol_21", window=63),
         RollingSkewKurt(column="log_return", window=126),
         DistributionShiftScore(column="log_return", window=21),
         DrawdownFeatures(),
-        RegimeIndicators(),
+        CompositeScores(),
     )

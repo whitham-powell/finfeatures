@@ -10,6 +10,10 @@ import pandas as pd
 import pytest
 
 from finfeatures.core import Columns
+from finfeatures.features.composite import (
+    DistributionShiftScore,
+    DrawdownFeatures,
+)
 from finfeatures.features.momentum import (
     RSI,
     RateOfChange,
@@ -25,10 +29,6 @@ from finfeatures.features.price import (
     Returns,
     ShapeDynamics,
     TypicalPrice,
-)
-from finfeatures.features.regime import (
-    DistributionShiftScore,
-    DrawdownFeatures,
 )
 from finfeatures.features.statistical import (
     RollingSkewKurt,
@@ -353,7 +353,7 @@ class TestRollingSkewKurt:
 
 
 # ===========================================================================
-# Regime features
+# Composite features
 # ===========================================================================
 
 
@@ -392,7 +392,7 @@ class TestDistributionShiftScore:
 
 
 # ===========================================================================
-# Log-space / candle shape features (regime-detection parity)
+# Log-space / candle shape features
 # ===========================================================================
 
 

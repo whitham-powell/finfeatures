@@ -1,16 +1,17 @@
 """
-Regime-detection features.
+Composite features.
 
-These are higher-order features designed to be inputs to regime detectors
-(HMM, iHMM, BOCPD, threshold classifiers, etc.).  They are derived purely
-from price and previously-computed indicator columns — they carry no
-knowledge of any specific regime detection algorithm or statistical test.
+These are higher-order features built from price and previously-computed
+indicator columns.  They are useful as inputs to a variety of downstream
+tasks — regime detection, risk monitoring, portfolio construction, etc.
 
-If you need a feature tied to a specific detection method (e.g. MMD, BOCPD
-run-length posterior, martingale statistic), implement it in your detection
-project as a Feature subclass and register it there.  Example:
+They carry no knowledge of any specific algorithm or statistical test.
 
-    # In your project: mmd_regime/features.py
+If you need a feature tied to a specific method (e.g. MMD, BOCPD
+run-length posterior, martingale statistic), implement it in your
+downstream project as a Feature subclass and register it there.  Example:
+
+    # In your project: my_project/features.py
     from finfeatures.core import Feature, Columns
 
     class RollingMMD(Feature):
@@ -26,7 +27,7 @@ project as a Feature subclass and register it there.  Example:
 Includes:
   - DistributionShiftScore: General rolling JS-divergence between adjacent windows
   - DrawdownFeatures:       Drawdown depth, duration, and recovery
-  - RegimeIndicators:       Composite continuous regime scores (stress, trend, momentum)
+  - CompositeScores:        Composite continuous scores (stress, trend, momentum)
 """
 
 from __future__ import annotations
@@ -143,9 +144,9 @@ class DrawdownFeatures(Feature):
         return out
 
 
-class RegimeIndicators(Feature):
+class CompositeScores(Feature):
     """
-    Composite continuous regime scores in [0, 1] built from standard
+    Composite continuous scores in [0, 1] built from standard
     indicator columns that must already be present in the DataFrame.
 
     These are inputs, not labels — a downstream classifier thresholds them.
@@ -153,8 +154,8 @@ class RegimeIndicators(Feature):
     Requires upstream features: realized_vol_21, macd_line, rsi_14
     """
 
-    name = "regime_indicators"
-    description = "Composite soft regime scores: stress, trend, momentum"
+    name = "composite_scores"
+    description = "Composite soft scores: stress, trend, momentum"
 
     required_cols = ["realized_vol_21", "macd_line", "rsi_14"]
 

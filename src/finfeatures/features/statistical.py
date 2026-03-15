@@ -3,7 +3,8 @@ Statistical features.
 
 Rolling distributional statistics: z-score normalisation, rolling higher
 moments (skewness, kurtosis), autocorrelation, and cross-asset correlation.
-These are the primary inputs to regime detection models.
+Useful across a wide range of downstream tasks including regime detection,
+risk monitoring, and general time-series modelling.
 """
 
 from __future__ import annotations
@@ -40,8 +41,7 @@ class RollingZScore(Feature):
 class RollingSkewKurt(Feature):
     """
     Rolling skewness and excess kurtosis of any named column.
-    Used to characterise tail risk in the return distribution —
-    a key input for regime detection.
+    Used to characterise tail risk in the return distribution.
     """
 
     name = "rolling_skew_kurt"
@@ -93,7 +93,7 @@ class RollingMoments(Feature):
 class RollingAutocorrelation(Feature):
     """
     Rolling autocorrelation at a given lag.
-    Elevated autocorrelation may indicate trending regimes.
+    Elevated autocorrelation may indicate trending or mean-reverting behaviour.
     """
 
     name = "rolling_autocorr"

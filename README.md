@@ -96,7 +96,7 @@ feature_matrix = enriched.dropna()
 | `volatility` | `GarmanKlassVolatility` | `garman_klass_vol_N` |
 | `volatility` | `BollingerBands` | `bb_upper_N`, `bb_lower_N`, `bb_pct_N`, `bb_width_N` |
 | `volatility` | `AverageTrueRange` | `atr_N`, `atr_pct_N` |
-| `volatility` | `VolatilityRegime` | `vol_regime_ratio`, `vol_regime_zscore` |
+| `volatility` | `VolatilityRatio` | `vol_ratio`, `vol_ratio_zscore` |
 | `trend` | `SimpleMovingAverage` | `sma_N`, `close_sma_N_ratio` |
 | `trend` | `ExponentialMovingAverage` | `ema_N` |
 | `trend` | `MACD` | `macd_line`, `macd_signal`, `macd_hist` (+ `_pct` variants) |
@@ -117,16 +117,16 @@ feature_matrix = enriched.dropna()
 | `statistical` | `RollingMoments` | mean, std, skew, kurt, VaR5, CVaR5 |
 | `statistical` | `RollingAutocorrelation` | `{col}_autocorr_lagK_N` |
 | `statistical` | `RollingCorrelation` | `corr_{colA}_{colB}_N` |
-| `regime` | `DistributionShiftScore` | `dist_shift_{col}_N` |
-| `regime` | `DrawdownFeatures` | `drawdown`, `drawdown_duration`, `drawdown_recovery` |
-| `regime` | `RegimeIndicators` | `stress_score`, `trend_score`, `momentum_score_indicator` |
+| `composite` | `DistributionShiftScore` | `dist_shift_{col}_N` |
+| `composite` | `DrawdownFeatures` | `drawdown`, `drawdown_duration`, `drawdown_recovery` |
+| `composite` | `CompositeScores` | `stress_score`, `trend_score`, `momentum_score_indicator` |
 
 ---
 
 ## Preset pipelines
 
 ```python
-from finfeatures import minimal_pipeline, standard_pipeline, regime_pipeline
+from finfeatures import minimal_pipeline, standard_pipeline, extended_pipeline
 
 # Returns + log returns only
 p = minimal_pipeline()
@@ -134,8 +134,8 @@ p = minimal_pipeline()
 # Full baseline: price → vol → trend → momentum → volume → statistical  (~40 cols)
 p = standard_pipeline()
 
-# standard + drawdown + JS-divergence shift + composite regime scores
-p = regime_pipeline()
+# standard + drawdown + JS-divergence shift + composite scores
+p = extended_pipeline()
 
 # Compose
 p = minimal_pipeline() + standard_pipeline()
@@ -200,7 +200,7 @@ raw = source.fetch("AAPL")
 
 ```python
 data = source.fetch_multiple(["SPY", "QQQ", "IWM"], start="2020-01-01")
-results = regime_pipeline().transform_many(data)
+results = extended_pipeline().transform_many(data)
 # {"SPY": enriched_df, "QQQ": enriched_df, "IWM": enriched_df}
 ```
 
@@ -226,7 +226,7 @@ finfeatures/
 │       │   ├── momentum.py
 │       │   ├── volume.py
 │       │   ├── statistical.py
-│       │   └── regime.py
+│       │   └── composite.py
 │       ├── sources/
 │       │   └── yfinance.py  YFinanceSource (optional dep)
 │       └── io/

@@ -1,5 +1,10 @@
 # Import all feature modules so their classes auto-register via __init_subclass__
-from . import momentum, price, regime, statistical, trend, volatility, volume  # noqa: F401
+from . import composite, momentum, price, statistical, trend, volatility, volume  # noqa: F401
+from .composite import (
+    CompositeScores,
+    DistributionShiftScore,
+    DrawdownFeatures,
+)
 from .momentum import (
     RSI,
     CommodityChannelIndex,
@@ -19,11 +24,6 @@ from .price import (
     Returns,
     ShapeDynamics,
     TypicalPrice,
-)
-from .regime import (
-    DistributionShiftScore,
-    DrawdownFeatures,
-    RegimeIndicators,
 )
 from .statistical import (
     RollingAutocorrelation,
@@ -46,7 +46,7 @@ from .volatility import (
     MovingTrueRange,
     ParkinsonVolatility,
     RollingVolatility,
-    VolatilityRegime,
+    VolatilityRatio,
 )
 from .volume import (
     VWAP,
@@ -74,7 +74,7 @@ __all__ = [
     "BollingerBands",
     "AverageTrueRange",
     "MovingTrueRange",
-    "VolatilityRegime",
+    "VolatilityRatio",
     # trend
     "SimpleMovingAverage",
     "ExponentialMovingAverage",
@@ -99,8 +99,8 @@ __all__ = [
     "RollingMoments",
     "RollingAutocorrelation",
     "RollingCorrelation",
-    # regime
+    # composite
     "DistributionShiftScore",
     "DrawdownFeatures",
-    "RegimeIndicators",
+    "CompositeScores",
 ]

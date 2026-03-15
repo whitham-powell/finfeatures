@@ -2,7 +2,7 @@
 End-to-end integration test.
 
 Simulates the full workflow: raw OHLCV → pipeline → feature matrix ready
-for downstream consumption (regime detector, backtester, ML model).
+for downstream consumption (ML model, regime detector, backtester, etc.).
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures import minimal_pipeline, regime_pipeline, standard_pipeline
+from finfeatures import extended_pipeline, minimal_pipeline, standard_pipeline
 from finfeatures.core import Columns
 from finfeatures.io import PandasAdapter
 
@@ -38,8 +38,8 @@ class TestEndToEnd:
         # All selected feature columns should be non-null
         assert clean[feature_cols].isna().sum().sum() == 0
 
-    def test_regime_pipeline_features_present(self, ohlcv_daily):
-        out = regime_pipeline().transform(ohlcv_daily)
+    def test_extended_pipeline_features_present(self, ohlcv_daily):
+        out = extended_pipeline().transform(ohlcv_daily)
         assert "dist_shift_log_return_21" in out.columns
         assert "drawdown" in out.columns
         assert "stress_score" in out.columns
@@ -112,17 +112,17 @@ class TestDownstreamConsumption:
     These are smoke tests only — not testing the downstream logic.
     """
 
-    def test_regime_detector_input_format(self, ohlcv_daily):
+    def test_extended_pipeline_input_format(self, ohlcv_daily):
         """
         Verify the feature matrix has the shape and columns
-        expected by a rolling-window regime detector (e.g. HMM).
+        expected by a rolling-window downstream model.
         """
-        out = regime_pipeline().transform(ohlcv_daily)
+        out = extended_pipeline().transform(ohlcv_daily)
         adapter = PandasAdapter(out)
         clean = adapter.dropna_features()
 
-        # Select typical regime detection inputs
-        regime_cols = [
+        # Select typical inputs
+        selected_cols = [
             c
             for c in clean.columns
             if any(
@@ -136,9 +136,9 @@ class TestDownstreamConsumption:
                 ]
             )
         ]
-        assert len(regime_cols) >= 3
+        assert len(selected_cols) >= 3
 
-        X = clean[regime_cols].to_numpy(dtype=float)
+        X = clean[selected_cols].to_numpy(dtype=float)
         assert not np.any(np.isnan(X))
         assert X.shape[0] > 100
 

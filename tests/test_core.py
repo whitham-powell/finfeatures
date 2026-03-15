@@ -10,8 +10,8 @@ from finfeatures.core import (
     Feature,
     FeaturePipeline,
     FeatureRegistry,
+    extended_pipeline,
     minimal_pipeline,
-    regime_pipeline,
     standard_pipeline,
 )
 from finfeatures.features.price import LogReturns, Returns
@@ -178,9 +178,9 @@ def test_standard_pipeline_runs(ohlcv_daily):
     assert len(out.columns) > 20
 
 
-def test_regime_pipeline_runs(ohlcv_daily):
-    out = regime_pipeline().transform(ohlcv_daily)
-    # regime_pipeline adds distribution shift and drawdown on top of standard
+def test_extended_pipeline_runs(ohlcv_daily):
+    out = extended_pipeline().transform(ohlcv_daily)
+    # extended_pipeline adds distribution shift and drawdown on top of standard
     assert "dist_shift_log_return_21" in out.columns
     assert "drawdown" in out.columns
     assert "stress_score" in out.columns

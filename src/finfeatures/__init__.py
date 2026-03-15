@@ -40,8 +40,8 @@ from finfeatures.core import (
     Feature,
     FeaturePipeline,
     FeatureRegistry,
+    extended_pipeline,
     minimal_pipeline,
-    regime_pipeline,
     standard_pipeline,
 )
 
@@ -57,7 +57,7 @@ __all__ = [
     # Preset pipelines
     "minimal_pipeline",
     "standard_pipeline",
-    "regime_pipeline",
+    "extended_pipeline",
     # Version
     "__version__",
 ]

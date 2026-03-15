@@ -155,17 +155,17 @@ class AverageTrueRange(Feature):
         return out
 
 
-class VolatilityRegime(Feature):
+class VolatilityRatio(Feature):
     """
-    Composite volatility regime indicator.
+    Short-term vs long-term volatility ratio.
     Compares short-term vol to long-term vol:
       vol_ratio = realised_vol_short / realised_vol_long
-    Values > 1 indicate elevated volatility (stress regime).
+    Values > 1 indicate elevated short-term volatility.
     Requires RollingVolatility to have been run for both windows.
     """
 
-    name = "volatility_regime"
-    description = "Short/long vol ratio as a regime indicator"
+    name = "volatility_ratio"
+    description = "Short/long vol ratio"
 
     def __init__(self, short_window: int = 21, long_window: int = 63) -> None:
         self.short_window = short_window
@@ -179,8 +179,8 @@ class VolatilityRegime(Feature):
         out = df.copy()
         short = df[f"realized_vol_{self.short_window}"]
         long_ = df[f"realized_vol_{self.long_window}"]
-        out["vol_regime_ratio"] = short / long_
-        out["vol_regime_zscore"] = (short - long_) / long_.rolling(self.long_window).std()
+        out["vol_ratio"] = short / long_
+        out["vol_ratio_zscore"] = (short - long_) / long_.rolling(self.long_window).std()
         return out
 
 
@@ -189,7 +189,7 @@ class MovingTrueRange(Feature):
     Simple rolling mean of True Range at multiple horizons.
 
     Unlike AverageTrueRange (which uses EWM smoothing), this computes a
-    plain rolling mean — matching the classic regime-detection feature set.
+    plain rolling mean of true range.
     """
 
     name = "moving_true_range"

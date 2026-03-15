@@ -44,8 +44,8 @@ class LogTransform(Feature):
     Log-transformed OHLCV columns.
 
     Produces log_open, log_high, log_low, log_close, log_volume.
-    Many regime-detection features operate in log-price space since
-    log returns are additive and more naturally normally distributed.
+    Many derived features operate in log-price space since log returns
+    are additive and more naturally normally distributed.
     """
 
     name = "log_transform"
