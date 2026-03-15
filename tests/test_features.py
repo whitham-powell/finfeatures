@@ -16,10 +16,14 @@ from finfeatures.features.momentum import (
     StochasticOscillator,
 )
 from finfeatures.features.price import (
+    CandleShape,
+    CrossDay,
     CumulativeReturn,
     LogReturns,
+    LogTransform,
     PriceRange,
     Returns,
+    ShapeDynamics,
     TypicalPrice,
 )
 from finfeatures.features.regime import (
@@ -38,6 +42,7 @@ from finfeatures.features.trend import (
 from finfeatures.features.volatility import (
     AverageTrueRange,
     BollingerBands,
+    MovingTrueRange,
     RollingVolatility,
 )
 from finfeatures.features.volume import (
@@ -384,3 +389,128 @@ class TestDistributionShiftScore:
         out = DistributionShiftScore(column="log_return", window=21)(df)
         valid = out["dist_shift_log_return_21"].dropna()
         assert (valid >= 0).all()
+
+
+# ===========================================================================
+# Log-space / candle shape features (regime-detection parity)
+# ===========================================================================
+
+
+class TestLogTransform:
+    def test_output_columns(self, ohlcv_daily):
+        out = LogTransform()(ohlcv_daily)
+        for col in ["log_open", "log_high", "log_low", "log_close", "log_volume"]:
+            assert col in out.columns
+
+    def test_log_close_correct(self, ohlcv_daily):
+        out = LogTransform()(ohlcv_daily)
+        np.testing.assert_allclose(
+            out["log_close"].values, np.log(ohlcv_daily["close"].values), rtol=1e-10
+        )
+
+    def test_log_volume_uses_log1p(self, ohlcv_daily):
+        out = LogTransform()(ohlcv_daily)
+        np.testing.assert_allclose(
+            out["log_volume"].values, np.log1p(ohlcv_daily["volume"].values), rtol=1e-10
+        )
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, LogTransform()(ohlcv_daily))
+
+
+class TestCandleShape:
+    @pytest.fixture()
+    def log_df(self, ohlcv_daily):
+        return LogTransform()(ohlcv_daily)
+
+    def test_output_columns(self, log_df):
+        out = CandleShape()(log_df)
+        for col in ["body", "range", "upper_wick", "lower_wick", "CLV"]:
+            assert col in out.columns
+
+    def test_range_non_negative(self, log_df):
+        out = CandleShape()(log_df)
+        assert (out["range"].dropna() >= 0).all()
+
+    def test_clv_bounded(self, log_df):
+        out = CandleShape()(log_df)
+        valid = out["CLV"].dropna()
+        assert (valid >= -0.01).all() and (valid <= 1.01).all()
+
+    def test_body_sign_matches_direction(self, log_df):
+        out = CandleShape()(log_df)
+        bullish = log_df["log_close"] > log_df["log_open"]
+        assert (out.loc[bullish, "body"] >= 0).all()
+
+
+class TestCrossDay:
+    @pytest.fixture()
+    def log_df(self, ohlcv_daily):
+        return LogTransform()(ohlcv_daily)
+
+    def test_output_columns(self, log_df):
+        out = CrossDay()(log_df)
+        for col in ["overnight", "C_minus_yH", "C_minus_yL", "O_minus_yH", "O_minus_yL"]:
+            assert col in out.columns
+
+    def test_first_row_nan(self, log_df):
+        out = CrossDay()(log_df)
+        assert np.isnan(out["C_minus_yH"].iloc[0])
+
+    def test_raw_preserved(self, log_df):
+        assert_raw_cols_preserved(log_df, CrossDay()(log_df))
+
+
+class TestShapeDynamics:
+    @pytest.fixture()
+    def shape_df(self, ohlcv_daily):
+        df = LogTransform()(ohlcv_daily)
+        return CandleShape()(df)
+
+    def test_output_columns(self, shape_df):
+        out = ShapeDynamics()(shape_df)
+        for col in ["d_body", "d_range", "d_upper_wick", "d_lower_wick", "d_CLV", "d_log_vol"]:
+            assert col in out.columns
+
+    def test_first_row_nan(self, shape_df):
+        out = ShapeDynamics()(shape_df)
+        assert np.isnan(out["d_body"].iloc[0])
+
+    def test_d_body_is_diff_of_body(self, shape_df):
+        out = ShapeDynamics()(shape_df)
+        expected = shape_df["body"].diff()
+        pd.testing.assert_series_equal(out["d_body"], expected, check_names=False)
+
+
+# ===========================================================================
+# Moving True Range & non-annualized vol
+# ===========================================================================
+
+
+class TestMovingTrueRange:
+    def test_output_columns(self, ohlcv_daily):
+        out = MovingTrueRange(windows=[20, 50])(ohlcv_daily)
+        assert "mtr_20" in out.columns
+        assert "mtr_50" in out.columns
+
+    def test_positive_values(self, ohlcv_daily):
+        out = MovingTrueRange(windows=[20])(ohlcv_daily)
+        assert (out["mtr_20"].dropna() > 0).all()
+
+    def test_leading_nans(self, ohlcv_daily):
+        out = MovingTrueRange(windows=[20])(ohlcv_daily)
+        # rolling(20) on true range produces 19 leading NaNs
+        assert out["mtr_20"].isna().sum() >= 19
+
+
+class TestRollingVolatilityRaw:
+    def test_raw_output_column(self, ohlcv_daily):
+        out = RollingVolatility(window=21, annualize=False)(ohlcv_daily)
+        assert "raw_vol_21" in out.columns
+        assert "realized_vol_21" not in out.columns
+
+    def test_raw_vs_annualized(self, ohlcv_daily):
+        raw = RollingVolatility(window=21, annualize=False)(ohlcv_daily)
+        ann = RollingVolatility(window=21, annualize=True)(ohlcv_daily)
+        ratio = ann["realized_vol_21"].dropna() / raw["raw_vol_21"].dropna()
+        np.testing.assert_allclose(ratio.values, np.sqrt(252), rtol=1e-10)

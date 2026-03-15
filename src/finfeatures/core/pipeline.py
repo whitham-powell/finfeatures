@@ -217,6 +217,12 @@ def regime_pipeline() -> FeaturePipeline:
         pipeline = regime_pipeline().add(RollingMMD(window=63))
         enriched = pipeline.transform(raw)
     """
+    from finfeatures.features.price import (
+        CandleShape,
+        CrossDay,
+        LogTransform,
+        ShapeDynamics,
+    )
     from finfeatures.features.regime import (
         DistributionShiftScore,
         DrawdownFeatures,
@@ -226,9 +232,23 @@ def regime_pipeline() -> FeaturePipeline:
         RollingSkewKurt,
         RollingZScore,
     )
+    from finfeatures.features.volatility import MovingTrueRange, RollingVolatility
 
     base = standard_pipeline()
     return base + FeaturePipeline(
+        # Log-space transforms (must precede candle/cross/dynamics)
+        LogTransform(),
+        CandleShape(),
+        CrossDay(),
+        ShapeDynamics(),
+        # Multi-horizon raw (non-annualized) realized vol
+        RollingVolatility(window=10, annualize=False),
+        RollingVolatility(window=30, annualize=False),
+        RollingVolatility(window=60, annualize=False),
+        RollingVolatility(window=90, annualize=False),
+        # Moving true range
+        MovingTrueRange(windows=[20, 50, 200]),
+        # Statistical & regime
         RollingZScore(column="realized_vol_21", window=63),
         RollingSkewKurt(column="log_return", window=126),
         DistributionShiftScore(column="log_return", window=21),

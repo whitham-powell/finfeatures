@@ -39,6 +39,112 @@ class LogReturns(Feature):
         return out
 
 
+class LogTransform(Feature):
+    """
+    Log-transformed OHLCV columns.
+
+    Produces log_open, log_high, log_low, log_close, log_volume.
+    Many regime-detection features operate in log-price space since
+    log returns are additive and more naturally normally distributed.
+    """
+
+    name = "log_transform"
+    required_cols = [Columns.OPEN, Columns.HIGH, Columns.LOW, Columns.CLOSE, Columns.VOLUME]
+    description = "Log-transformed OHLCV columns"
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        out["log_open"] = np.log(df[Columns.OPEN])
+        out["log_high"] = np.log(df[Columns.HIGH])
+        out["log_low"] = np.log(df[Columns.LOW])
+        out["log_close"] = np.log(df[Columns.CLOSE])
+        out["log_volume"] = np.log1p(df[Columns.VOLUME])
+        return out
+
+
+class CandleShape(Feature):
+    """
+    Candle shape features in log-price space.
+
+    Requires LogTransform to have run first.
+
+      - body:        log_close - log_open  (positive = bullish)
+      - range:       log_high - log_low    (total candle extent)
+      - upper_wick:  log_high - log_close
+      - lower_wick:  log_close - log_low
+      - CLV:         (log_close - log_low) / (log_high - log_low)  (Close Location Value)
+    """
+
+    name = "candle_shape"
+    required_cols = ["log_open", "log_high", "log_low", "log_close"]
+    description = "Candle body, wicks, and close location value in log space"
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        log_o = df["log_open"]
+        log_h = df["log_high"]
+        log_l = df["log_low"]
+        log_c = df["log_close"]
+
+        out["body"] = log_c - log_o
+        hl_range = log_h - log_l
+        out["range"] = hl_range
+        out["upper_wick"] = log_h - log_c
+        out["lower_wick"] = log_c - log_l
+        out["CLV"] = (log_c - log_l) / hl_range.replace(0, np.nan)
+        return out
+
+
+class CrossDay(Feature):
+    """
+    Cross-day relationship features in log-price space.
+
+    Measures today's close/open relative to yesterday's high/low.
+    Requires LogTransform to have run first.
+    """
+
+    name = "cross_day"
+    required_cols = ["log_open", "log_high", "log_low", "log_close"]
+    description = "Cross-day high/low relationships in log space"
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        log_o = df["log_open"]
+        log_h = df["log_high"]
+        log_l = df["log_low"]
+        log_c = df["log_close"]
+
+        out["overnight"] = log_o - log_c.shift(1)
+        out["C_minus_yH"] = log_c - log_h.shift(1)
+        out["C_minus_yL"] = log_c - log_l.shift(1)
+        out["O_minus_yH"] = log_o - log_h.shift(1)
+        out["O_minus_yL"] = log_o - log_l.shift(1)
+        return out
+
+
+class ShapeDynamics(Feature):
+    """
+    First differences of candle shape features and log volume.
+
+    Captures how the microstructure of price bars is changing day-to-day.
+    Requires LogTransform and CandleShape to have run first.
+    """
+
+    name = "shape_dynamics"
+    required_cols = ["body", "range", "upper_wick", "lower_wick", "CLV", "log_volume"]
+    description = "First differences of candle shape features"
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        out["d_body"] = df["body"].diff()
+        out["d_range"] = df["range"].diff()
+        out["d_upper_wick"] = df["upper_wick"].diff()
+        out["d_lower_wick"] = df["lower_wick"].diff()
+        out["d_CLV"] = df["CLV"].diff()
+        out["d_log_vol"] = df["log_volume"].diff()
+        return out
+
+
 class PriceRange(Feature):
     """
     Intraday range features:

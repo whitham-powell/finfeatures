@@ -23,15 +23,21 @@ class RollingVolatility(Feature):
     required_cols = [Columns.CLOSE]
     description = "Rolling annualised close-to-close realised volatility"
 
-    def __init__(self, window: int = 21, trading_days: int = 252) -> None:
+    def __init__(self, window: int = 21, trading_days: int = 252, annualize: bool = True) -> None:
         self.window = window
         self.trading_days = trading_days
+        self.annualize = annualize
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         log_ret: pd.Series = np.log(df[Columns.CLOSE] / df[Columns.CLOSE].shift(1))  # type: ignore[assignment]
-        col = f"realized_vol_{self.window}"
-        out[col] = log_ret.rolling(self.window).std() * np.sqrt(self.trading_days)
+        raw = log_ret.rolling(self.window).std()
+        if self.annualize:
+            col = f"realized_vol_{self.window}"
+            out[col] = raw * np.sqrt(self.trading_days)
+        else:
+            col = f"raw_vol_{self.window}"
+            out[col] = raw
         return out
 
 
@@ -175,4 +181,35 @@ class VolatilityRegime(Feature):
         long_ = df[f"realized_vol_{self.long_window}"]
         out["vol_regime_ratio"] = short / long_
         out["vol_regime_zscore"] = (short - long_) / long_.rolling(self.long_window).std()
+        return out
+
+
+class MovingTrueRange(Feature):
+    """
+    Simple rolling mean of True Range at multiple horizons.
+
+    Unlike AverageTrueRange (which uses EWM smoothing), this computes a
+    plain rolling mean — matching the classic regime-detection feature set.
+    """
+
+    name = "moving_true_range"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE]
+    description = "Rolling mean of true range at multiple horizons"
+
+    def __init__(self, windows: list[int] | None = None) -> None:
+        self.windows = windows or [20, 50, 200]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        prev_close = df[Columns.CLOSE].shift(1)
+        tr = pd.concat(
+            [
+                df[Columns.HIGH] - df[Columns.LOW],
+                (df[Columns.HIGH] - prev_close).abs(),
+                (df[Columns.LOW] - prev_close).abs(),
+            ],
+            axis=1,
+        ).max(axis=1)
+        for w in self.windows:
+            out[f"mtr_{w}"] = tr.rolling(w).mean()
         return out

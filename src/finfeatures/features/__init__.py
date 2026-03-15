@@ -9,11 +9,15 @@ from .momentum import (
     WilliamsR,
 )
 from .price import (
+    CandleShape,
+    CrossDay,
     CumulativeReturn,
     LogReturns,
+    LogTransform,
     PriceRange,
     PriceRelativeToHigh,
     Returns,
+    ShapeDynamics,
     TypicalPrice,
 )
 from .regime import (
@@ -39,6 +43,7 @@ from .volatility import (
     AverageTrueRange,
     BollingerBands,
     GarmanKlassVolatility,
+    MovingTrueRange,
     ParkinsonVolatility,
     RollingVolatility,
     VolatilityRegime,
@@ -54,6 +59,10 @@ __all__ = [
     # price
     "Returns",
     "LogReturns",
+    "LogTransform",
+    "CandleShape",
+    "CrossDay",
+    "ShapeDynamics",
     "PriceRange",
     "TypicalPrice",
     "CumulativeReturn",
@@ -64,6 +73,7 @@ __all__ = [
     "GarmanKlassVolatility",
     "BollingerBands",
     "AverageTrueRange",
+    "MovingTrueRange",
     "VolatilityRegime",
     # trend
     "SimpleMovingAverage",
