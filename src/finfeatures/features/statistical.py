@@ -26,10 +26,7 @@ class RollingZScore(Feature):
     def __init__(self, column: str = Columns.LOG_RETURN, window: int = 21) -> None:
         self.column = column
         self.window = window
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [self.column]
+        self.required_cols = [self.column]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -53,10 +50,7 @@ class RollingSkewKurt(Feature):
     def __init__(self, column: str = Columns.LOG_RETURN, window: int = 63) -> None:
         self.column = column
         self.window = window
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [self.column]
+        self.required_cols = [self.column]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -78,10 +72,7 @@ class RollingMoments(Feature):
     def __init__(self, column: str = Columns.LOG_RETURN, window: int = 63) -> None:
         self.column = column
         self.window = window
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [self.column]
+        self.required_cols = [self.column]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -117,10 +108,7 @@ class RollingAutocorrelation(Feature):
         self.column = column
         self.window = window
         self.lag = lag
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [self.column]
+        self.required_cols = [self.column]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -149,10 +137,7 @@ class RollingCorrelation(Feature):
         self.col_a = col_a
         self.col_b = col_b
         self.window = window
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [self.col_a, self.col_b]
+        self.required_cols = [self.col_a, self.col_b]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()

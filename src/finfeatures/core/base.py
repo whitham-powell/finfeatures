@@ -75,7 +75,7 @@ class Feature(abc.ABC):
     name: ClassVar[str] = ""
 
     #: Columns that must be present in the input DataFrame.
-    required_cols: ClassVar[list[str]] = []
+    required_cols: list[str] = []
 
     #: Optional human-readable description.
     description: ClassVar[str] = ""

@@ -29,7 +29,7 @@ class RollingVolatility(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        log_ret = np.log(df[Columns.CLOSE] / df[Columns.CLOSE].shift(1))
+        log_ret: pd.Series = np.log(df[Columns.CLOSE] / df[Columns.CLOSE].shift(1))  # type: ignore[assignment]
         col = f"realized_vol_{self.window}"
         out[col] = log_ret.rolling(self.window).std() * np.sqrt(self.trading_days)
         return out
@@ -53,7 +53,8 @@ class ParkinsonVolatility(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        hl_sq = np.log(df[Columns.HIGH] / df[Columns.LOW]) ** 2
+        hl_log: pd.Series = np.log(df[Columns.HIGH] / df[Columns.LOW])  # type: ignore[assignment]
+        hl_sq = hl_log**2
         factor = 1.0 / (4.0 * self.window * np.log(2))
         col = f"parkinson_vol_{self.window}"
         out[col] = hl_sq.rolling(self.window).sum().mul(factor).pow(0.5) * np.sqrt(
@@ -78,8 +79,8 @@ class GarmanKlassVolatility(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        log_hl = np.log(df[Columns.HIGH] / df[Columns.LOW])
-        log_co = np.log(df[Columns.CLOSE] / df[Columns.OPEN])
+        log_hl: pd.Series = np.log(df[Columns.HIGH] / df[Columns.LOW])  # type: ignore[assignment]
+        log_co: pd.Series = np.log(df[Columns.CLOSE] / df[Columns.OPEN])  # type: ignore[assignment]
         gk = 0.5 * log_hl**2 - (2 * np.log(2) - 1) * log_co**2
         col = f"garman_klass_vol_{self.window}"
         out[col] = gk.rolling(self.window).mean().pow(0.5) * np.sqrt(self.trading_days)
@@ -163,10 +164,7 @@ class VolatilityRegime(Feature):
     def __init__(self, short_window: int = 21, long_window: int = 63) -> None:
         self.short_window = short_window
         self.long_window = long_window
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [
+        self.required_cols = [
             f"realized_vol_{self.short_window}",
             f"realized_vol_{self.long_window}",
         ]

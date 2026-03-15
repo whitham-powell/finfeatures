@@ -67,10 +67,7 @@ class DistributionShiftScore(Feature):
         self.column = column
         self.window = window
         self.n_bins = n_bins
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [self.column]
+        self.required_cols = [self.column]
 
     @staticmethod
     def _js_divergence(p: np.ndarray, q: np.ndarray, eps: float = 1e-10) -> float:
@@ -83,13 +80,13 @@ class DistributionShiftScore(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        col = df[self.column].values
+        col = np.asarray(df[self.column].values)
         n = len(col)
         scores = np.full(n, np.nan)
         w = self.window
 
-        global_min = np.nanpercentile(col, 1)
-        global_max = np.nanpercentile(col, 99)
+        global_min = float(np.nanpercentile(col, 1))
+        global_max = float(np.nanpercentile(col, 99))
         bins = np.linspace(global_min, global_max, self.n_bins + 1)
 
         for t in range(2 * w, n):
@@ -159,9 +156,7 @@ class RegimeIndicators(Feature):
     name = "regime_indicators"
     description = "Composite soft regime scores: stress, trend, momentum"
 
-    @property
-    def required_cols(self) -> list[str]:
-        return ["realized_vol_21", "macd_line", "rsi_14"]
+    required_cols = ["realized_vol_21", "macd_line", "rsi_14"]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()

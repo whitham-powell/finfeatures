@@ -156,10 +156,7 @@ class MACrossover(Feature):
     def __init__(self, fast: int = 50, slow: int = 200) -> None:
         self.fast = fast
         self.slow = slow
-
-    @property
-    def required_cols(self) -> list[str]:
-        return [f"sma_{self.fast}", f"sma_{self.slow}"]
+        self.required_cols = [f"sma_{self.fast}", f"sma_{self.slow}"]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
