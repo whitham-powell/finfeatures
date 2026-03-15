@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, "release/*"]
+    branches: [master, "release/*"]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   # ── Lint & type-check ──────────────────────────────────────────────────────
