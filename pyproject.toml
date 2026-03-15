@@ -5,7 +5,9 @@ description = "Source-agnostic financial timeseries feature library"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-authors = [{ name = "Your Name", email = "you@example.com" }]
+authors = [
+    { name = "Elijah Whitham-Powell", email = "20101453+whitham-powell@users.noreply.github.com" },
+]
 
 keywords = ["finance", "timeseries", "features", "indicators", "ohlcv"]
 classifiers = [
@@ -22,29 +24,28 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-dependencies = [
-    "pandas>=2.0",
-    "numpy>=1.24",
-    "scipy>=1.10",
-]
+dependencies = ["pandas>=2.0", "numpy>=1.24", "scipy>=1.10"]
 
 [project.optional-dependencies]
 # Optional data source helpers — the core library requires none of these
 yfinance = ["yfinance>=0.2"]
 
 [project.urls]
-Homepage   = "https://github.com/your-org/finfeatures"
-Repository = "https://github.com/your-org/finfeatures"
-Issues     = "https://github.com/your-org/finfeatures/issues"
+Homepage = "https://github.com/whitham-powell/finfeatures"
+Repository = "https://github.com/whitham-powell/finfeatures"
+Issues = "https://github.com/whitham-powell/finfeatures/issues"
 
 # ── Build ─────────────────────────────────────────────────────────────────
 [build-system]
-requires      = ["uv_build>=0.10.4,<0.11.0"]
+requires = ["uv_build>=0.10.4,<0.11.0"]
 build-backend = "uv_build"
 
 # ── uv ────────────────────────────────────────────────────────────────────
 # Dev dependencies use PEP 735 dependency groups — the uv-native approach.
 # Install with:  uv sync --group dev
+[tool.uv]
+default-groups = ["dev"]
+
 [dependency-groups]
 dev = [
     "pytest>=8",
@@ -57,9 +58,9 @@ dev = [
 
 # ── Ruff (lint + format) ──────────────────────────────────────────────────
 [tool.ruff]
-line-length    = 100
+line-length = 100
 target-version = "py310"
-src            = ["src"]
+src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -69,24 +70,22 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 # ── Mypy ──────────────────────────────────────────────────────────────────
 [tool.mypy]
-python_version         = "3.10"
-warn_return_any        = true
-warn_unused_configs    = true
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
 ignore_missing_imports = true
 
 # ── Pytest ────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts   = "-ra -q --tb=short"
-markers   = [
-    "network: live network requests — skip with -m 'not network'",
-]
+addopts = "-ra -q --tb=short"
+markers = ["network: live network requests — skip with -m 'not network'"]
 
 # ── Coverage ──────────────────────────────────────────────────────────────
 [tool.coverage.run]
 source = ["finfeatures"]
 branch = true
-omit   = ["tests/*"]
+omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true

@@ -30,9 +30,9 @@ def ohlcv_daily() -> pd.DataFrame:
 
     # Construct OHLC from close
     noise = rng.uniform(0.002, 0.010, n)
-    open_  = close * (1 + rng.uniform(-0.005, 0.005, n))
-    high   = close * (1 + noise)
-    low    = close * (1 - noise)
+    open_ = close * (1 + rng.uniform(-0.005, 0.005, n))
+    high = close * (1 + noise)
+    low = close * (1 - noise)
     volume = rng.lognormal(mean=15, sigma=0.5, size=n).astype(int)
 
     return pd.DataFrame(
@@ -51,10 +51,10 @@ def ohlcv_short() -> pd.DataFrame:
     noise = rng.uniform(0.002, 0.008, n)
     return pd.DataFrame(
         {
-            "open":   close * (1 + rng.uniform(-0.003, 0.003, n)),
-            "high":   close * (1 + noise),
-            "low":    close * (1 - noise),
-            "close":  close,
+            "open": close * (1 + rng.uniform(-0.003, 0.003, n)),
+            "high": close * (1 + noise),
+            "low": close * (1 - noise),
+            "close": close,
             "volume": rng.integers(100_000, 1_000_000, n),
         },
         index=dates,

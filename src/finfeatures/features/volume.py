@@ -34,7 +34,7 @@ class VolumeFeatures(Feature):
         vol_sma = vol.rolling(self.window).mean()
         vol_std = vol.rolling(self.window).std()
         out[f"volume_zscore_{self.window}"] = (vol - vol_sma) / vol_std
-        out[f"volume_rel_{self.window}"]    = vol / vol_sma
+        out[f"volume_rel_{self.window}"] = vol / vol_sma
         return out
 
 
@@ -98,12 +98,10 @@ class ChaikinMoneyFlow(Feature):
         hl = df[Columns.HIGH] - df[Columns.LOW]
         hl_safe = hl.replace(0, np.nan)
         mf_multiplier = (
-            (df[Columns.CLOSE] - df[Columns.LOW]) -
-            (df[Columns.HIGH] - df[Columns.CLOSE])
+            (df[Columns.CLOSE] - df[Columns.LOW]) - (df[Columns.HIGH] - df[Columns.CLOSE])
         ) / hl_safe
         mfv = mf_multiplier * df[Columns.VOLUME]
         out[f"cmf_{self.window}"] = (
-            mfv.rolling(self.window).sum() /
-            df[Columns.VOLUME].rolling(self.window).sum()
+            mfv.rolling(self.window).sum() / df[Columns.VOLUME].rolling(self.window).sum()
         )
         return out

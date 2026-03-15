@@ -12,18 +12,18 @@ from typing import Any, ClassVar, Protocol, runtime_checkable
 
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Column name constants — canonical OHLCV column names expected by all features
 # ---------------------------------------------------------------------------
 
+
 class Columns:
-    OPEN   = "open"
-    HIGH   = "high"
-    LOW    = "low"
-    CLOSE  = "close"
+    OPEN = "open"
+    HIGH = "high"
+    LOW = "low"
+    CLOSE = "close"
     VOLUME = "volume"
-    RETURN = "return"          # simple return
+    RETURN = "return"  # simple return
     LOG_RETURN = "log_return"  # log return
 
     OHLCV: ClassVar[list[str]] = ["open", "high", "low", "close", "volume"]
@@ -33,6 +33,7 @@ class Columns:
 # ---------------------------------------------------------------------------
 # DataFrame adapter protocol — makes the library swap-able to polars, etc.
 # ---------------------------------------------------------------------------
+
 
 @runtime_checkable
 class DataFrameAdapter(Protocol):
@@ -47,12 +48,13 @@ class DataFrameAdapter(Protocol):
     def __getitem__(self, key: Any) -> Any: ...
     def __setitem__(self, key: Any, value: Any) -> None: ...
     def __contains__(self, key: Any) -> bool: ...
-    def copy(self) -> "DataFrameAdapter": ...
+    def copy(self) -> DataFrameAdapter: ...
 
 
 # ---------------------------------------------------------------------------
 # Abstract Feature
 # ---------------------------------------------------------------------------
+
 
 class Feature(abc.ABC):
     """
@@ -131,6 +133,7 @@ class Feature(abc.ABC):
 # Abstract DataSource
 # ---------------------------------------------------------------------------
 
+
 class DataSource(abc.ABC):
     """
     Abstract base class for market data providers.
@@ -145,7 +148,7 @@ class DataSource(abc.ABC):
         self,
         symbol: str,
         start: str | None = None,
-        end:   str | None = None,
+        end: str | None = None,
         interval: str = "1d",
         **kwargs: Any,
     ) -> pd.DataFrame:
@@ -161,7 +164,7 @@ class DataSource(abc.ABC):
         self,
         symbols: list[str],
         start: str | None = None,
-        end:   str | None = None,
+        end: str | None = None,
         interval: str = "1d",
         **kwargs: Any,
     ) -> dict[str, pd.DataFrame]:
@@ -171,6 +174,7 @@ class DataSource(abc.ABC):
 # ---------------------------------------------------------------------------
 # Feature Registry — global, auto-populated via __init_subclass__
 # ---------------------------------------------------------------------------
+
 
 class FeatureRegistry:
     """
@@ -197,8 +201,7 @@ class FeatureRegistry:
     def get(cls, name: str) -> type[Feature]:
         if name not in cls._registry:
             raise KeyError(
-                f"No feature named '{name}' is registered.  "
-                f"Available: {sorted(cls._registry)}"
+                f"No feature named '{name}' is registered.  Available: {sorted(cls._registry)}"
             )
         return cls._registry[name]
 

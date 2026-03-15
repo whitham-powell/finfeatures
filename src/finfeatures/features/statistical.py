@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy import stats as scipy_stats
 
 from finfeatures.core.base import Columns, Feature
 
@@ -35,7 +34,7 @@ class RollingZScore(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         col = df[self.column]
-        mu  = col.rolling(self.window).mean()
+        mu = col.rolling(self.window).mean()
         sig = col.rolling(self.window).std()
         out[f"{self.column}_zscore_{self.window}"] = (col - mu) / sig
         return out
@@ -62,7 +61,7 @@ class RollingSkewKurt(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         col = df[self.column]
-        w   = self.window
+        w = self.window
         out[f"{self.column}_skew_{w}"] = col.rolling(w).skew()
         out[f"{self.column}_kurt_{w}"] = col.rolling(w).kurt()  # excess kurtosis
         return out
@@ -87,13 +86,13 @@ class RollingMoments(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         col = df[self.column]
-        w   = self.window
-        out[f"{self.column}_mean_{w}"]  = col.rolling(w).mean()
-        out[f"{self.column}_std_{w}"]   = col.rolling(w).std()
-        out[f"{self.column}_skew_{w}"]  = col.rolling(w).skew()
-        out[f"{self.column}_kurt_{w}"]  = col.rolling(w).kurt()
+        w = self.window
+        out[f"{self.column}_mean_{w}"] = col.rolling(w).mean()
+        out[f"{self.column}_std_{w}"] = col.rolling(w).std()
+        out[f"{self.column}_skew_{w}"] = col.rolling(w).skew()
+        out[f"{self.column}_kurt_{w}"] = col.rolling(w).kurt()
         # Value at Risk (historical, non-parametric)
-        out[f"{self.column}_var5_{w}"]  = col.rolling(w).quantile(0.05)
+        out[f"{self.column}_var5_{w}"] = col.rolling(w).quantile(0.05)
         out[f"{self.column}_cvar5_{w}"] = col.rolling(w).apply(
             lambda x: x[x <= np.quantile(x, 0.05)].mean(), raw=True
         )
@@ -126,10 +125,8 @@ class RollingAutocorrelation(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         col = df[self.column]
-        out[f"{self.column}_autocorr_lag{self.lag}_{self.window}"] = (
-            col.rolling(self.window).apply(
-                lambda x: pd.Series(x).autocorr(lag=self.lag), raw=True
-            )
+        out[f"{self.column}_autocorr_lag{self.lag}_{self.window}"] = col.rolling(self.window).apply(
+            lambda x: pd.Series(x).autocorr(lag=self.lag), raw=True
         )
         return out
 

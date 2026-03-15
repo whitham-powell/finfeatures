@@ -22,8 +22,6 @@ Usage
 
 from __future__ import annotations
 
-from typing import Sequence
-
 import pandas as pd
 
 from .base import Feature, FeatureRegistry
@@ -48,21 +46,20 @@ class FeaturePipeline:
 
     def __init__(self, *features: Feature | str) -> None:
         self._steps: list[Feature] = [
-            FeatureRegistry.get(f)() if isinstance(f, str) else f
-            for f in features
+            FeatureRegistry.get(f)() if isinstance(f, str) else f for f in features
         ]
 
     # ------------------------------------------------------------------
     # Composition helpers
     # ------------------------------------------------------------------
 
-    def add(self, feature: Feature | str) -> "FeaturePipeline":
+    def add(self, feature: Feature | str) -> FeaturePipeline:
         """Return a new pipeline with the given feature appended."""
         if isinstance(feature, str):
             feature = FeatureRegistry.get(feature)()
         return FeaturePipeline(*self._steps, feature)
 
-    def __add__(self, other: "FeaturePipeline | Feature") -> "FeaturePipeline":
+    def __add__(self, other: FeaturePipeline | Feature) -> FeaturePipeline:
         if isinstance(other, Feature):
             return self.add(other)
         return FeaturePipeline(*self._steps, *other._steps)
@@ -95,8 +92,7 @@ class FeaturePipeline:
                 result = feature(result)
             except Exception as exc:
                 raise RuntimeError(
-                    f"Feature '{feature.name}' failed during pipeline "
-                    f"execution: {exc}"
+                    f"Feature '{feature.name}' failed during pipeline execution: {exc}"
                 ) from exc
 
         # Guarantee raw columns survive
@@ -152,9 +148,11 @@ class FeaturePipeline:
 # Preset pipelines — convenient starting points
 # ---------------------------------------------------------------------------
 
+
 def minimal_pipeline() -> FeaturePipeline:
     """Returns + log returns only.  Suitable as the base for everything."""
-    from finfeatures.features.price import Returns, LogReturns
+    from finfeatures.features.price import LogReturns, Returns
+
     return FeaturePipeline(Returns(), LogReturns())
 
 
@@ -163,16 +161,20 @@ def standard_pipeline() -> FeaturePipeline:
     A comprehensive baseline covering returns, vol, trend and momentum.
     Safe default for regime detection and backtesting inputs.
     """
-    from finfeatures.features.price import Returns, LogReturns, PriceRange, TypicalPrice
-    from finfeatures.features.volatility import (
-        RollingVolatility, BollingerBands, AverageTrueRange,
-    )
-    from finfeatures.features.trend import (
-        SimpleMovingAverage, ExponentialMovingAverage, MACD,
-    )
     from finfeatures.features.momentum import RSI, RateOfChange
+    from finfeatures.features.price import LogReturns, PriceRange, Returns, TypicalPrice
+    from finfeatures.features.statistical import RollingSkewKurt, RollingZScore
+    from finfeatures.features.trend import (
+        MACD,
+        ExponentialMovingAverage,
+        SimpleMovingAverage,
+    )
+    from finfeatures.features.volatility import (
+        AverageTrueRange,
+        BollingerBands,
+        RollingVolatility,
+    )
     from finfeatures.features.volume import VolumeFeatures
-    from finfeatures.features.statistical import RollingZScore, RollingSkewKurt
 
     return FeaturePipeline(
         # Layer 1: price transforms
@@ -215,11 +217,14 @@ def regime_pipeline() -> FeaturePipeline:
         pipeline = regime_pipeline().add(RollingMMD(window=63))
         enriched = pipeline.transform(raw)
     """
-    from finfeatures.features.statistical import (
-        RollingZScore, RollingSkewKurt,
-    )
     from finfeatures.features.regime import (
-        DistributionShiftScore, DrawdownFeatures, RegimeIndicators,
+        DistributionShiftScore,
+        DrawdownFeatures,
+        RegimeIndicators,
+    )
+    from finfeatures.features.statistical import (
+        RollingSkewKurt,
+        RollingZScore,
     )
 
     base = standard_pipeline()

@@ -19,13 +19,12 @@ class TestYFinanceNormalise:
 
     def _make_raw_yf(self) -> pd.DataFrame:
         """Simulate the DataFrame that yfinance returns."""
-        import numpy as np
         dates = pd.date_range("2020-01-02", periods=5, freq="B", tz="America/New_York")
         return pd.DataFrame(
             {
                 "Open": [100.0, 101.0, 102.0, 103.0, 104.0],
                 "High": [101.0, 102.0, 103.0, 104.0, 105.0],
-                "Low":  [99.0, 100.0, 101.0, 102.0, 103.0],
+                "Low": [99.0, 100.0, 101.0, 102.0, 103.0],
                 "Close": [100.5, 101.5, 102.5, 103.5, 104.5],
                 "Volume": [1_000_000] * 5,
                 "Dividends": [0.0] * 5,
@@ -78,9 +77,7 @@ class TestYFinanceFetch:
 
     def test_fetch_multiple_returns_dict(self):
         source = YFinanceSource()
-        result = source.fetch_multiple(
-            ["SPY", "QQQ"], start="2024-01-01", end="2024-02-28"
-        )
+        result = source.fetch_multiple(["SPY", "QQQ"], start="2024-01-01", end="2024-02-28")
         assert set(result.keys()) == {"SPY", "QQQ"}
         for df in result.values():
             assert isinstance(df, pd.DataFrame)

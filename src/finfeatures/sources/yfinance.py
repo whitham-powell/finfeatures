@@ -14,10 +14,15 @@ import pandas as pd
 
 from finfeatures.core.base import Columns, DataSource
 
-
 _YFINANCE_INTERVAL_MAP = {
-    "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
-    "1h": "1h", "1d": "1d", "1wk": "1wk", "1mo": "1mo",
+    "1m": "1m",
+    "5m": "5m",
+    "15m": "15m",
+    "30m": "30m",
+    "1h": "1h",
+    "1d": "1d",
+    "1wk": "1wk",
+    "1mo": "1mo",
 }
 
 
@@ -40,7 +45,7 @@ class YFinanceSource(DataSource):
         self,
         symbol: str,
         start: str | None = None,
-        end:   str | None = None,
+        end: str | None = None,
         interval: str = "1d",
         **kwargs: Any,
     ) -> pd.DataFrame:
@@ -54,8 +59,7 @@ class YFinanceSource(DataSource):
             import yfinance as yf
         except ImportError as e:
             raise ImportError(
-                "yfinance is required for YFinanceSource.  "
-                "Install it with:  pip install yfinance"
+                "yfinance is required for YFinanceSource.  Install it with:  pip install yfinance"
             ) from e
 
         ticker = yf.Ticker(symbol)
@@ -79,7 +83,7 @@ class YFinanceSource(DataSource):
         self,
         symbols: list[str],
         start: str | None = None,
-        end:   str | None = None,
+        end: str | None = None,
         interval: str = "1d",
         **kwargs: Any,
     ) -> dict[str, pd.DataFrame]:
@@ -97,10 +101,10 @@ class YFinanceSource(DataSource):
         We keep only OHLCV with lowercase names.
         """
         rename_map = {
-            "Open":   Columns.OPEN,
-            "High":   Columns.HIGH,
-            "Low":    Columns.LOW,
-            "Close":  Columns.CLOSE,
+            "Open": Columns.OPEN,
+            "High": Columns.HIGH,
+            "Low": Columns.LOW,
+            "Close": Columns.CLOSE,
             "Volume": Columns.VOLUME,
         }
         available = {k: v for k, v in rename_map.items() if k in df.columns}

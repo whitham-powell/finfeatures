@@ -35,6 +35,7 @@ class PandasAdapter:
     def to_numpy(self, columns: list[str] | None = None) -> Any:
         """Return a numpy array of the specified columns (all if None)."""
         import numpy as np
+
         if columns:
             return self._df[columns].to_numpy(dtype=float, na_value=np.nan)
         return self._df.to_numpy(dtype=float, na_value=np.nan)
@@ -42,6 +43,7 @@ class PandasAdapter:
     def feature_columns(self, exclude_raw: bool = True) -> list[str]:
         """Return derived feature column names, optionally excluding raw OHLCV."""
         from finfeatures.core.base import Columns
+
         raw = set(Columns.OHLCV) if exclude_raw else set()
         return [c for c in self._df.columns if c not in raw]
 
@@ -50,16 +52,13 @@ class PandasAdapter:
         return self._df.dropna()
 
     def __repr__(self) -> str:
-        return (
-            f"PandasAdapter("
-            f"shape={self._df.shape}, "
-            f"columns={list(self._df.columns)[:6]}...)"
-        )
+        return f"PandasAdapter(shape={self._df.shape}, columns={list(self._df.columns)[:6]}...)"
 
 
 # ---------------------------------------------------------------------------
 # Polars stub — placeholder that raises a clear error until implemented
 # ---------------------------------------------------------------------------
+
 
 class PolarsAdapter:
     """

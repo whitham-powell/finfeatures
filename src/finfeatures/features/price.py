@@ -55,9 +55,9 @@ class PriceRange(Feature):
         out = df.copy()
         out["high_low_range"] = (df[Columns.HIGH] - df[Columns.LOW]) / df[Columns.CLOSE]
         out["open_close_range"] = (df[Columns.CLOSE] - df[Columns.OPEN]) / df[Columns.OPEN]
-        out["overnight_gap"] = (
-            (df[Columns.OPEN] - df[Columns.CLOSE].shift(1)) / df[Columns.CLOSE].shift(1)
-        )
+        out["overnight_gap"] = (df[Columns.OPEN] - df[Columns.CLOSE].shift(1)) / df[
+            Columns.CLOSE
+        ].shift(1)
         return out
 
 
@@ -73,9 +73,7 @@ class TypicalPrice(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        out["typical_price"] = (
-            df[Columns.HIGH] + df[Columns.LOW] + df[Columns.CLOSE]
-        ) / 3.0
+        out["typical_price"] = (df[Columns.HIGH] + df[Columns.LOW] + df[Columns.CLOSE]) / 3.0
         return out
 
 
@@ -113,7 +111,7 @@ class PriceRelativeToHigh(Feature):
         out = df.copy()
         w = self.window
         rolling_high = df[Columns.CLOSE].rolling(w).max()
-        rolling_low  = df[Columns.CLOSE].rolling(w).min()
+        rolling_low = df[Columns.CLOSE].rolling(w).min()
         out[f"pct_from_high_{w}"] = (df[Columns.CLOSE] - rolling_high) / rolling_high
-        out[f"pct_from_low_{w}"]  = (df[Columns.CLOSE] - rolling_low) / rolling_low
+        out[f"pct_from_low_{w}"] = (df[Columns.CLOSE] - rolling_low) / rolling_low
         return out

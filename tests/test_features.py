@@ -10,44 +10,51 @@ import pandas as pd
 import pytest
 
 from finfeatures.core import Columns
-from finfeatures.features.price import (
-    Returns, LogReturns, PriceRange, TypicalPrice,
-    CumulativeReturn, PriceRelativeToHigh,
-)
-from finfeatures.features.volatility import (
-    RollingVolatility, ParkinsonVolatility, GarmanKlassVolatility,
-    BollingerBands, AverageTrueRange, VolatilityRegime,
-)
-from finfeatures.features.trend import (
-    SimpleMovingAverage, ExponentialMovingAverage, MACD,
-    TrendStrength, MACrossover,
-)
 from finfeatures.features.momentum import (
-    RSI, RateOfChange, StochasticOscillator,
-    WilliamsR, CommodityChannelIndex,
+    RSI,
+    RateOfChange,
+    StochasticOscillator,
 )
-from finfeatures.features.volume import (
-    VolumeFeatures, OnBalanceVolume, VWAP, ChaikinMoneyFlow,
-)
-from finfeatures.features.statistical import (
-    RollingZScore, RollingSkewKurt, RollingMoments,
-    RollingAutocorrelation,
+from finfeatures.features.price import (
+    CumulativeReturn,
+    LogReturns,
+    PriceRange,
+    Returns,
+    TypicalPrice,
 )
 from finfeatures.features.regime import (
-    DistributionShiftScore, DrawdownFeatures,
+    DistributionShiftScore,
+    DrawdownFeatures,
 )
-
+from finfeatures.features.statistical import (
+    RollingSkewKurt,
+    RollingZScore,
+)
+from finfeatures.features.trend import (
+    MACD,
+    ExponentialMovingAverage,
+    SimpleMovingAverage,
+)
+from finfeatures.features.volatility import (
+    AverageTrueRange,
+    BollingerBands,
+    RollingVolatility,
+)
+from finfeatures.features.volume import (
+    OnBalanceVolume,
+    VolumeFeatures,
+)
 
 # ===========================================================================
 # Helpers
 # ===========================================================================
 
+
 def assert_raw_cols_preserved(original: pd.DataFrame, result: pd.DataFrame) -> None:
     for col in original.columns:
         assert col in result.columns, f"Raw column '{col}' lost"
         pd.testing.assert_series_equal(
-            original[col], result[col], check_names=False,
-            obj=f"column '{col}' was mutated"
+            original[col], result[col], check_names=False, obj=f"column '{col}' was mutated"
         )
 
 
@@ -61,6 +68,7 @@ def assert_column_in_range(series: pd.Series, lo: float, hi: float) -> None:
 # ===========================================================================
 # Price features
 # ===========================================================================
+
 
 class TestReturns:
     def test_output_column(self, ohlcv_daily):
@@ -128,8 +136,13 @@ class TestCumulativeReturn:
     def test_monotone_if_monotone_input(self):
         dates = pd.date_range("2020-01-01", periods=10, freq="B")
         df = pd.DataFrame(
-            {"open": range(1, 11), "high": range(2, 12), "low": range(1, 11),
-             "close": range(1, 11), "volume": [1000] * 10},
+            {
+                "open": range(1, 11),
+                "high": range(2, 12),
+                "low": range(1, 11),
+                "close": range(1, 11),
+                "volume": [1000] * 10,
+            },
             index=dates,
         )
         out = CumulativeReturn()(df)
@@ -139,6 +152,7 @@ class TestCumulativeReturn:
 # ===========================================================================
 # Volatility features
 # ===========================================================================
+
 
 class TestRollingVolatility:
     def test_output_column(self, ohlcv_daily):
@@ -192,6 +206,7 @@ class TestAverageTrueRange:
 # Trend features
 # ===========================================================================
 
+
 class TestSMA:
     def test_output_columns(self, ohlcv_daily):
         out = SimpleMovingAverage(windows=[10, 20])(ohlcv_daily)
@@ -201,9 +216,7 @@ class TestSMA:
 
     def test_sma_1_equals_close(self, ohlcv_daily):
         out = SimpleMovingAverage(windows=[1])(ohlcv_daily)
-        pd.testing.assert_series_equal(
-            out["sma_1"], ohlcv_daily["close"], check_names=False
-        )
+        pd.testing.assert_series_equal(out["sma_1"], ohlcv_daily["close"], check_names=False)
 
     def test_200_sma_has_199_leading_nans(self, ohlcv_daily):
         out = SimpleMovingAverage(windows=[200])(ohlcv_daily)
@@ -232,6 +245,7 @@ class TestMACD:
 # ===========================================================================
 # Momentum features
 # ===========================================================================
+
 
 class TestRSI:
     def test_output_column(self, ohlcv_daily):
@@ -268,6 +282,7 @@ class TestStochastic:
 # Volume features
 # ===========================================================================
 
+
 class TestVolumeFeatures:
     def test_output_columns(self, ohlcv_daily):
         out = VolumeFeatures(window=20)(ohlcv_daily)
@@ -286,8 +301,13 @@ class TestOBV:
         dates = pd.date_range("2020-01-01", periods=10, freq="B")
         close = np.arange(1.0, 11.0)
         df = pd.DataFrame(
-            {"open": close - 0.1, "high": close + 0.2, "low": close - 0.2,
-             "close": close, "volume": np.ones(10) * 1000},
+            {
+                "open": close - 0.1,
+                "high": close + 0.2,
+                "low": close - 0.2,
+                "close": close,
+                "volume": np.ones(10) * 1000,
+            },
             index=dates,
         )
         out = OnBalanceVolume()(df)
@@ -299,16 +319,18 @@ class TestOBV:
 # Statistical features
 # ===========================================================================
 
+
 class TestRollingZScore:
     def test_output_column(self, ohlcv_daily):
-        from finfeatures.core import FeaturePipeline
         from finfeatures.features.price import LogReturns
+
         df = LogReturns()(ohlcv_daily)
         out = RollingZScore(column="log_return", window=21)(df)
         assert "log_return_zscore_21" in out.columns
 
     def test_mean_near_zero(self, ohlcv_daily):
         from finfeatures.features.price import LogReturns
+
         df = LogReturns()(ohlcv_daily)
         out = RollingZScore(column="log_return", window=21)(df)
         mean = out["log_return_zscore_21"].dropna().mean()
@@ -318,6 +340,7 @@ class TestRollingZScore:
 class TestRollingSkewKurt:
     def test_output_columns(self, ohlcv_daily):
         from finfeatures.features.price import LogReturns
+
         df = LogReturns()(ohlcv_daily)
         out = RollingSkewKurt(column="log_return", window=63)(df)
         assert "log_return_skew_63" in out.columns
@@ -327,6 +350,7 @@ class TestRollingSkewKurt:
 # ===========================================================================
 # Regime features
 # ===========================================================================
+
 
 class TestDrawdownFeatures:
     def test_output_columns(self, ohlcv_daily):
@@ -345,16 +369,17 @@ class TestDrawdownFeatures:
         assert (valid >= 0).all() and (valid <= 1 + 1e-9).all()
 
 
-
 class TestDistributionShiftScore:
     def test_output_column(self, ohlcv_daily):
         from finfeatures.features.price import LogReturns
+
         df = LogReturns()(ohlcv_daily)
         out = DistributionShiftScore(column="log_return", window=21)(df)
         assert "dist_shift_log_return_21" in out.columns
 
     def test_non_negative(self, ohlcv_daily):
         from finfeatures.features.price import LogReturns
+
         df = LogReturns()(ohlcv_daily)
         out = DistributionShiftScore(column="log_return", window=21)(df)
         valid = out["dist_shift_log_return_21"].dropna()

@@ -9,17 +9,9 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
-from finfeatures import standard_pipeline, regime_pipeline, minimal_pipeline
-from finfeatures.core import FeaturePipeline, Columns
-from finfeatures.features.price import Returns, LogReturns
-from finfeatures.features.volatility import RollingVolatility, BollingerBands
-from finfeatures.features.trend import SimpleMovingAverage, MACD
-from finfeatures.features.momentum import RSI
-from finfeatures.features.volume import VolumeFeatures
-from finfeatures.features.statistical import RollingZScore, RollingSkewKurt
-from finfeatures.features.regime import DrawdownFeatures
+from finfeatures import minimal_pipeline, regime_pipeline, standard_pipeline
+from finfeatures.core import Columns
 from finfeatures.io import PandasAdapter
 
 
@@ -80,7 +72,7 @@ class TestEndToEnd:
         }
         results = minimal_pipeline().transform_many(assets)
         assert set(results.keys()) == {"SPY", "QQQ", "IWM"}
-        for symbol, df in results.items():
+        for _symbol, df in results.items():
             assert Columns.RETURN in df.columns
             assert Columns.LOG_RETURN in df.columns
 
@@ -94,8 +86,9 @@ class TestEndToEnd:
         out = standard_pipeline().transform(ohlcv_daily)
         for col in Columns.OHLCV:
             pd.testing.assert_series_equal(
-                ohlcv_daily[col], out[col],
-                obj=f"column '{col}' was altered by the pipeline"
+                ohlcv_daily[col],
+                out[col],
+                obj=f"column '{col}' was altered by the pipeline",
             )
 
     def test_pandas_adapter_to_numpy(self, ohlcv_daily):
@@ -130,8 +123,18 @@ class TestDownstreamConsumption:
 
         # Select typical regime detection inputs
         regime_cols = [
-            c for c in clean.columns
-            if any(tag in c for tag in ["log_return", "realized_vol", "dist_shift", "zscore", "drawdown"])
+            c
+            for c in clean.columns
+            if any(
+                tag in c
+                for tag in [
+                    "log_return",
+                    "realized_vol",
+                    "dist_shift",
+                    "zscore",
+                    "drawdown",
+                ]
+            )
         ]
         assert len(regime_cols) >= 3
 

@@ -78,17 +78,17 @@ class MACD(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        ema_fast   = df[Columns.CLOSE].ewm(span=self.fast, adjust=False).mean()
-        ema_slow   = df[Columns.CLOSE].ewm(span=self.slow, adjust=False).mean()
-        macd_line  = ema_fast - ema_slow
+        ema_fast = df[Columns.CLOSE].ewm(span=self.fast, adjust=False).mean()
+        ema_slow = df[Columns.CLOSE].ewm(span=self.slow, adjust=False).mean()
+        macd_line = ema_fast - ema_slow
         signal_line = macd_line.ewm(span=self.signal, adjust=False).mean()
-        out["macd_line"]    = macd_line
-        out["macd_signal"]  = signal_line
-        out["macd_hist"]    = macd_line - signal_line
+        out["macd_line"] = macd_line
+        out["macd_signal"] = signal_line
+        out["macd_hist"] = macd_line - signal_line
         # Normalise by price for cross-asset comparability
-        out["macd_line_pct"]   = macd_line / df[Columns.CLOSE]
+        out["macd_line_pct"] = macd_line / df[Columns.CLOSE]
         out["macd_signal_pct"] = signal_line / df[Columns.CLOSE]
-        out["macd_hist_pct"]   = out["macd_hist"] / df[Columns.CLOSE]
+        out["macd_hist_pct"] = out["macd_hist"] / df[Columns.CLOSE]
         return out
 
 
@@ -113,35 +113,34 @@ class TrendStrength(Feature):
         out = df.copy()
         w = self.window
         high, low, close = df[Columns.HIGH], df[Columns.LOW], df[Columns.CLOSE]
-        prev_high  = high.shift(1)
-        prev_low   = low.shift(1)
+        prev_high = high.shift(1)
+        prev_low = low.shift(1)
         prev_close = close.shift(1)
 
         # True Range
         tr = pd.concat(
-            [high - low, (high - prev_close).abs(), (low - prev_close).abs()],
-            axis=1
+            [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1
         ).max(axis=1)
 
         # Directional movement
-        up_move   = high - prev_high
+        up_move = high - prev_high
         down_move = prev_low - low
 
-        plus_dm  = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+        plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
         minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
 
-        atr_s     = pd.Series(tr).ewm(span=w, adjust=False).mean()
+        atr_s = pd.Series(tr).ewm(span=w, adjust=False).mean()
         plus_dm_s = pd.Series(plus_dm).ewm(span=w, adjust=False).mean()
         minus_dm_s = pd.Series(minus_dm).ewm(span=w, adjust=False).mean()
 
-        di_plus  = 100 * plus_dm_s / atr_s
+        di_plus = 100 * plus_dm_s / atr_s
         di_minus = 100 * minus_dm_s / atr_s
         dx = 100 * (di_plus - di_minus).abs() / (di_plus + di_minus)
         adx = dx.ewm(span=w, adjust=False).mean()
 
-        out[f"adx_{w}"]   = adx.values
-        out["di_plus"]    = di_plus.values
-        out["di_minus"]   = di_minus.values
+        out[f"adx_{w}"] = adx.values
+        out["di_plus"] = di_plus.values
+        out["di_minus"] = di_minus.values
         return out
 
 

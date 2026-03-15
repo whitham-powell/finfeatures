@@ -32,19 +32,18 @@ Layers
     DataFrameAdapter → thin wrapper for backend portability (pandas default)
 """
 
-from finfeatures.core import (
-    Columns,
-    Feature,
-    FeatureRegistry,
-    DataSource,
-    FeaturePipeline,
-    minimal_pipeline,
-    standard_pipeline,
-    regime_pipeline,
-)
-
 # Import features subpackage to trigger auto-registration of all features
 import finfeatures.features  # noqa: F401
+from finfeatures.core import (
+    Columns,
+    DataSource,
+    Feature,
+    FeaturePipeline,
+    FeatureRegistry,
+    minimal_pipeline,
+    regime_pipeline,
+    standard_pipeline,
+)
 
 __version__ = "0.1.0"
 

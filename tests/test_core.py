@@ -2,27 +2,25 @@
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import pytest
 
-import finfeatures  # triggers feature auto-registration
 from finfeatures.core import (
     Columns,
     Feature,
     FeaturePipeline,
     FeatureRegistry,
     minimal_pipeline,
-    standard_pipeline,
     regime_pipeline,
+    standard_pipeline,
 )
-from finfeatures.features.price import Returns, LogReturns
+from finfeatures.features.price import LogReturns, Returns
 from finfeatures.features.volatility import RollingVolatility
-
 
 # ---------------------------------------------------------------------------
 # Columns constants
 # ---------------------------------------------------------------------------
+
 
 def test_columns_ohlcv_list():
     assert set(Columns.OHLCV) == {"open", "high", "low", "close", "volume"}
@@ -31,6 +29,7 @@ def test_columns_ohlcv_list():
 # ---------------------------------------------------------------------------
 # Feature base class contract
 # ---------------------------------------------------------------------------
+
 
 def test_feature_preserves_raw_columns(ohlcv_daily, raw_cols):
     """Every feature must preserve all source columns in its output."""
@@ -60,6 +59,7 @@ def test_feature_missing_required_col_raises():
 # FeatureRegistry
 # ---------------------------------------------------------------------------
 
+
 def test_registry_contains_builtin_features():
     registry = FeatureRegistry.all()
     expected = ["returns", "log_returns", "rsi", "macd", "rolling_volatility"]
@@ -85,9 +85,11 @@ def test_registry_list_is_sorted():
 def test_registry_duplicate_name_raises():
     """Registering two different classes with the same name must raise."""
     with pytest.raises(ValueError, match="already registered"):
+
         class DuplicateReturns(Feature):
             name = "returns"  # already taken
             required_cols = [Columns.CLOSE]
+
             def compute(self, df):
                 return df.copy()
 
@@ -95,6 +97,7 @@ def test_registry_duplicate_name_raises():
 # ---------------------------------------------------------------------------
 # FeaturePipeline
 # ---------------------------------------------------------------------------
+
 
 def test_pipeline_applies_features_in_order(ohlcv_daily, raw_cols):
     pipeline = FeaturePipeline(Returns(), LogReturns())
@@ -106,9 +109,7 @@ def test_pipeline_applies_features_in_order(ohlcv_daily, raw_cols):
 
 
 def test_pipeline_preserves_raw_cols_through_all_steps(ohlcv_daily, raw_cols):
-    pipeline = FeaturePipeline(
-        Returns(), LogReturns(), RollingVolatility(window=21)
-    )
+    pipeline = FeaturePipeline(Returns(), LogReturns(), RollingVolatility(window=21))
     out = pipeline.transform(ohlcv_daily)
     for col in raw_cols:
         assert col in out.columns
@@ -163,6 +164,7 @@ def test_pipeline_lookup_by_string(ohlcv_daily):
 # ---------------------------------------------------------------------------
 # Preset pipelines smoke tests
 # ---------------------------------------------------------------------------
+
 
 def test_minimal_pipeline_runs(ohlcv_daily):
     out = minimal_pipeline().transform(ohlcv_daily)

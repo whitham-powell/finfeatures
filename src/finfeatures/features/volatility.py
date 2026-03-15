@@ -53,12 +53,11 @@ class ParkinsonVolatility(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        hl_sq = (np.log(df[Columns.HIGH] / df[Columns.LOW]) ** 2)
+        hl_sq = np.log(df[Columns.HIGH] / df[Columns.LOW]) ** 2
         factor = 1.0 / (4.0 * self.window * np.log(2))
         col = f"parkinson_vol_{self.window}"
-        out[col] = (
-            hl_sq.rolling(self.window).sum().mul(factor).pow(0.5)
-            * np.sqrt(self.trading_days)
+        out[col] = hl_sq.rolling(self.window).sum().mul(factor).pow(0.5) * np.sqrt(
+            self.trading_days
         )
         return out
 
@@ -83,10 +82,7 @@ class GarmanKlassVolatility(Feature):
         log_co = np.log(df[Columns.CLOSE] / df[Columns.OPEN])
         gk = 0.5 * log_hl**2 - (2 * np.log(2) - 1) * log_co**2
         col = f"garman_klass_vol_{self.window}"
-        out[col] = (
-            gk.rolling(self.window).mean().pow(0.5)
-            * np.sqrt(self.trading_days)
-        )
+        out[col] = gk.rolling(self.window).mean().pow(0.5) * np.sqrt(self.trading_days)
         return out
 
 
@@ -106,13 +102,13 @@ class BollingerBands(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         w = self.window
-        sma  = df[Columns.CLOSE].rolling(w).mean()
-        std  = df[Columns.CLOSE].rolling(w).std()
+        sma = df[Columns.CLOSE].rolling(w).mean()
+        std = df[Columns.CLOSE].rolling(w).std()
         upper = sma + self.num_std * std
         lower = sma - self.num_std * std
         out[f"bb_middle_{w}"] = sma
-        out[f"bb_upper_{w}"]  = upper
-        out[f"bb_lower_{w}"]  = lower
+        out[f"bb_upper_{w}"] = upper
+        out[f"bb_lower_{w}"] = lower
         # %B: position within bands (0 = lower, 1 = upper)
         out[f"bb_pct_{w}"] = (df[Columns.CLOSE] - lower) / (upper - lower)
         # Bandwidth: normalised width of the bands
@@ -141,7 +137,7 @@ class AverageTrueRange(Feature):
             [
                 df[Columns.HIGH] - df[Columns.LOW],
                 (df[Columns.HIGH] - prev_close).abs(),
-                (df[Columns.LOW]  - prev_close).abs(),
+                (df[Columns.LOW] - prev_close).abs(),
             ],
             axis=1,
         ).max(axis=1)
@@ -180,7 +176,5 @@ class VolatilityRegime(Feature):
         short = df[f"realized_vol_{self.short_window}"]
         long_ = df[f"realized_vol_{self.long_window}"]
         out["vol_regime_ratio"] = short / long_
-        out["vol_regime_zscore"] = (
-            (short - long_) / long_.rolling(self.long_window).std()
-        )
+        out["vol_regime_zscore"] = (short - long_) / long_.rolling(self.long_window).std()
         return out

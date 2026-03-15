@@ -28,8 +28,8 @@ class RSI(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         delta = df[Columns.CLOSE].diff()
-        gain  = delta.clip(lower=0)
-        loss  = (-delta).clip(lower=0)
+        gain = delta.clip(lower=0)
+        loss = (-delta).clip(lower=0)
         avg_gain = gain.ewm(alpha=1 / self.window, adjust=False).mean()
         avg_loss = loss.ewm(alpha=1 / self.window, adjust=False).mean()
         rs = avg_gain / avg_loss.replace(0, np.nan)
@@ -52,9 +52,7 @@ class RateOfChange(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        out[f"roc_{self.window}"] = (
-            df[Columns.CLOSE] / df[Columns.CLOSE].shift(self.window) - 1
-        )
+        out[f"roc_{self.window}"] = df[Columns.CLOSE] / df[Columns.CLOSE].shift(self.window) - 1
         return out
 
 
@@ -75,7 +73,7 @@ class StochasticOscillator(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        low_min  = df[Columns.LOW].rolling(self.k_window).min()
+        low_min = df[Columns.LOW].rolling(self.k_window).min()
         high_max = df[Columns.HIGH].rolling(self.k_window).max()
         pct_k = 100 * (df[Columns.CLOSE] - low_min) / (high_max - low_min)
         out[f"stoch_k_{self.k_window}"] = pct_k
@@ -100,7 +98,7 @@ class WilliamsR(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         high_max = df[Columns.HIGH].rolling(self.window).max()
-        low_min  = df[Columns.LOW].rolling(self.window).min()
+        low_min = df[Columns.LOW].rolling(self.window).min()
         out[f"williams_r_{self.window}"] = (
             -100 * (high_max - df[Columns.CLOSE]) / (high_max - low_min)
         )
@@ -122,11 +120,9 @@ class CommodityChannelIndex(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        tp  = (df[Columns.HIGH] + df[Columns.LOW] + df[Columns.CLOSE]) / 3
+        tp = (df[Columns.HIGH] + df[Columns.LOW] + df[Columns.CLOSE]) / 3
         sma = tp.rolling(self.window).mean()
-        mad = tp.rolling(self.window).apply(
-            lambda x: np.abs(x - x.mean()).mean(), raw=True
-        )
+        mad = tp.rolling(self.window).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
         out[f"cci_{self.window}"] = (tp - sma) / (0.015 * mad)
         return out
 
