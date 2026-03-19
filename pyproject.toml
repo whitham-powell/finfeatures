@@ -44,7 +44,7 @@ build-backend = "uv_build"
 # Dev dependencies use PEP 735 dependency groups — the uv-native approach.
 # Install with:  uv sync --group dev
 [tool.uv]
-default-groups = ["dev"]
+default-groups = []
 
 [dependency-groups]
 dev = [
