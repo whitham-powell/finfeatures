@@ -26,13 +26,13 @@ jobs:
         run: uv sync --group dev
 
       - name: Ruff lint
-        run: uv run ruff check src/ tests/
+        run: uv run --group dev ruff check src/ tests/
 
       - name: Ruff format check
-        run: uv run ruff format --check src/ tests/
+        run: uv run --group dev ruff format --check src/ tests/
 
       - name: Mypy
-        run: uv run mypy src/finfeatures
+        run: uv run --group dev mypy src/finfeatures
 
   # ── Tests (matrix: multiple Python versions) ──────────────────────────────
   test:
@@ -58,7 +58,7 @@ jobs:
         run: uv sync --python ${{ matrix.python-version }} --group dev
 
       - name: Run tests (no network)
-        run: uv run pytest -m "not network" --cov=finfeatures --cov-report=xml
+        run: uv run --group dev pytest -m "not network" --cov=finfeatures --cov-report=xml
 
       - name: Upload coverage
         uses: codecov/codecov-action@v5
