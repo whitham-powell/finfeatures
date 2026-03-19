@@ -51,7 +51,7 @@ def test_feature_does_not_mutate_input(ohlcv_daily):
 def test_feature_missing_required_col_raises():
     """Missing required column must raise ValueError with informative message."""
     df = pd.DataFrame({"open": [1, 2, 3]})  # no 'close'
-    with pytest.raises(ValueError, match="requires columns"):
+    with pytest.raises(ValueError, match="requires columns.*Available columns"):
         Returns()(df)
 
 

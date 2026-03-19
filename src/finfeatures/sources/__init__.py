@@ -1,3 +1,9 @@
-from .yfinance import YFinanceSource
+"""
+Data source implementations.
 
-__all__ = ["YFinanceSource"]
+No sources are imported eagerly — import the one you need::
+
+    from finfeatures.sources.yfinance import YFinanceSource
+"""
+
+__all__: list[str] = []

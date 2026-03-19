@@ -7,21 +7,17 @@ OHLCV market data.  Raw columns are never lost; all features are additive.
 
 Quick start
 -----------
-    from finfeatures import FeaturePipeline, standard_pipeline
-    from finfeatures.sources import YFinanceSource
+    import pandas as pd
+    from finfeatures import standard_pipeline
 
-    # 1. Fetch raw data
-    source = YFinanceSource()
-    raw = source.fetch("SPY", start="2020-01-01", end="2024-12-31")
+    # 1. Load raw OHLCV data (any source — CSV, database, API, …)
+    raw = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
 
-    # 2. Build a pipeline
-    pipeline = standard_pipeline()
-
-    # 3. Derive features
-    enriched = pipeline.transform(raw)
+    # 2. Derive features
+    enriched = standard_pipeline().transform(raw)
     print(enriched.columns.tolist())
 
-    # 4. Use in any downstream task (regime detection, backtesting, ML)
+    # 3. Use in any downstream task (backtesting, ML, …)
     feature_matrix = enriched.dropna()
 
 Layers
@@ -36,7 +32,6 @@ Layers
 import finfeatures.features  # noqa: F401
 from finfeatures.core import (
     Columns,
-    DataSource,
     Feature,
     FeaturePipeline,
     FeatureRegistry,
@@ -52,7 +47,6 @@ __all__ = [
     "Columns",
     "Feature",
     "FeatureRegistry",
-    "DataSource",
     "FeaturePipeline",
     # Preset pipelines
     "minimal_pipeline",

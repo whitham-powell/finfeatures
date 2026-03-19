@@ -63,13 +63,12 @@ uv add --editable ./finfeatures
 ## Quickstart
 
 ```python
+import pandas as pd
 from finfeatures import standard_pipeline
-from finfeatures.sources import YFinanceSource
 
-# 1. Fetch raw OHLCV — any DataSource works, yfinance is just the reference
-source = YFinanceSource()
-raw = source.fetch("SPY", start="2020-01-01", end="2024-12-31")
-# raw columns: open, high, low, close, volume  (DatetimeIndex)
+# 1. Load raw OHLCV data (any source — CSV, database, API, …)
+raw = pd.read_csv("spy.csv", index_col="date", parse_dates=True)
+# expected columns: open, high, low, close, volume  (DatetimeIndex)
 
 # 2. Build features
 enriched = standard_pipeline().transform(raw)
@@ -77,6 +76,16 @@ enriched = standard_pipeline().transform(raw)
 
 # 3. Feed downstream
 feature_matrix = enriched.dropna()
+```
+
+### Using yfinance (optional)
+
+```python
+from finfeatures.sources.yfinance import YFinanceSource
+
+source = YFinanceSource()
+raw = source.fetch("SPY", start="2020-01-01", end="2024-12-31")
+enriched = standard_pipeline().transform(raw)
 ```
 
 ---
@@ -173,24 +182,23 @@ enriched = pipeline.transform(raw)
 
 ## Custom data sources
 
-Implement `DataSource` to swap any market data provider:
+Subclass `DataSource` to integrate any market data provider:
 
 ```python
 from finfeatures.core import DataSource, Columns
 import pandas as pd
 
-class MyCSVSource(DataSource):
-    def __init__(self, data_dir: str): self.data_dir = data_dir
+class MyAPISource(DataSource):
+    def __init__(self, api_key: str): self.api_key = api_key
 
     def fetch(self, symbol, start=None, end=None, interval="1d", **kw):
-        df = pd.read_csv(f"{self.data_dir}/{symbol}.csv",
-                         index_col="date", parse_dates=True)
+        df = ...  # call your API
         return df  # must return lowercase open/high/low/close/volume + DatetimeIndex
 
     def fetch_multiple(self, symbols, **kw):
         return {s: self.fetch(s, **kw) for s in symbols}
 
-source = MyCSVSource("/data/market")
+source = MyAPISource("key")
 raw = source.fetch("AAPL")
 ```
 

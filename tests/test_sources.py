@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from finfeatures.core import Columns
-from finfeatures.sources import YFinanceSource
+from finfeatures.sources.yfinance import YFinanceSource
 
 
 class TestYFinanceNormalise:

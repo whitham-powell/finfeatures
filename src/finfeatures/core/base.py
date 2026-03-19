@@ -122,7 +122,8 @@ class Feature(abc.ABC):
         if missing:
             raise ValueError(
                 f"Feature '{self.name}' requires columns {missing} "
-                f"which are missing from the input DataFrame."
+                f"which are missing from the input DataFrame. "
+                f"Available columns: {list(df.columns)}"
             )
 
     def __repr__(self) -> str:
