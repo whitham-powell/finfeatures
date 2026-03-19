@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures.core.base import Columns, Feature
+from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
 class RollingZScore(Feature):
@@ -25,16 +25,21 @@ class RollingZScore(Feature):
     description = "Rolling z-score normalisation of a target column"
 
     def __init__(self, column: str = Columns.LOG_RETURN, window: int = 21) -> None:
+        _validate_window(window)
         self.column = column
         self.window = window
         self.required_cols = [self.column]
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         col = df[self.column]
         mu = col.rolling(self.window).mean()
         sig = col.rolling(self.window).std()
-        out[f"{self.column}_zscore_{self.window}"] = (col - mu) / sig
+        out[f"{self.column}_zscore_{self.window}"] = safe_divide(col - mu, sig)
         return out
 
 
@@ -48,9 +53,14 @@ class RollingSkewKurt(Feature):
     description = "Rolling skewness and excess kurtosis"
 
     def __init__(self, column: str = Columns.LOG_RETURN, window: int = 63) -> None:
+        _validate_window(window)
         self.column = column
         self.window = window
         self.required_cols = [self.column]
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -70,9 +80,14 @@ class RollingMoments(Feature):
     description = "Full rolling distributional moments (mean, std, skew, kurt)"
 
     def __init__(self, column: str = Columns.LOG_RETURN, window: int = 63) -> None:
+        _validate_window(window)
         self.column = column
         self.window = window
         self.required_cols = [self.column]
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -105,6 +120,8 @@ class RollingAutocorrelation(Feature):
         window: int = 63,
         lag: int = 1,
     ) -> None:
+        _validate_window(window)
+        _validate_window(lag, "lag")
         self.column = column
         self.window = window
         self.lag = lag
@@ -134,6 +151,7 @@ class RollingCorrelation(Feature):
         col_b: str = "realized_vol_21",
         window: int = 63,
     ) -> None:
+        _validate_window(window)
         self.col_a = col_a
         self.col_b = col_b
         self.window = window

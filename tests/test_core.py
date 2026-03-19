@@ -190,3 +190,80 @@ def test_pipeline_no_raw_column_loss_standard(ohlcv_daily, raw_cols):
     out = standard_pipeline().transform(ohlcv_daily)
     for col in raw_cols:
         assert col in out.columns, f"'{col}' lost after standard_pipeline"
+
+
+# ---------------------------------------------------------------------------
+# DatetimeIndex validation (Item 1)
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_rejects_range_index():
+    """Pipeline must reject a DataFrame with a RangeIndex."""
+    df = pd.DataFrame(
+        {
+            "open": [1, 2],
+            "high": [2, 3],
+            "low": [0.5, 1.5],
+            "close": [1.5, 2.5],
+            "volume": [100, 200],
+        }
+    )
+    pipeline = FeaturePipeline(Returns())
+    with pytest.raises(ValueError, match="DatetimeIndex"):
+        pipeline.transform(df)
+
+
+def test_pipeline_accepts_datetime_index(ohlcv_daily):
+    """Existing DatetimeIndex fixtures must still work."""
+    pipeline = FeaturePipeline(Returns())
+    out = pipeline.transform(ohlcv_daily)
+    assert "return" in out.columns
+
+
+# ---------------------------------------------------------------------------
+# min_periods (Item 4)
+# ---------------------------------------------------------------------------
+
+
+def test_feature_min_periods_default():
+    """Base Feature.min_periods returns 0."""
+    from finfeatures.core.base import Feature
+
+    class Dummy(Feature):
+        name = "_dummy_test_min_periods"
+        required_cols: list[str] = []
+
+        def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+            return df.copy()
+
+    assert Dummy().min_periods == 0
+
+
+def test_pipeline_min_periods():
+    """Pipeline.min_periods should be max across steps."""
+    pipeline = FeaturePipeline(Returns(), LogReturns(), RollingVolatility(window=21))
+    assert pipeline.min_periods == 22  # window + 1
+
+
+# ---------------------------------------------------------------------------
+# Dependency validation (Item 5)
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_validates_missing_dependency():
+    """CompositeScores without MACD/RSI/Vol upstream must raise."""
+    from finfeatures.features.composite import CompositeScores
+
+    pipeline = FeaturePipeline(Returns(), CompositeScores())
+    df = pd.DataFrame(
+        {"open": [1.0], "high": [2.0], "low": [0.5], "close": [1.5], "volume": [100]},
+        index=pd.to_datetime(["2020-01-01"]),
+    )
+    with pytest.raises(ValueError, match="requires columns"):
+        pipeline.transform(df)
+
+
+def test_pipeline_valid_preset_passes(ohlcv_daily):
+    """extended_pipeline().transform(ohlcv_daily) must work end-to-end."""
+    out = extended_pipeline().transform(ohlcv_daily)
+    assert "stress_score" in out.columns

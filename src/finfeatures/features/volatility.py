@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures.core.base import Columns, Feature
+from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
 class RollingVolatility(Feature):
@@ -24,9 +24,20 @@ class RollingVolatility(Feature):
     description = "Rolling annualised close-to-close realised volatility"
 
     def __init__(self, window: int = 21, trading_days: int = 252, annualize: bool = True) -> None:
+        _validate_window(window)
         self.window = window
         self.trading_days = trading_days
         self.annualize = annualize
+
+    @property
+    def min_periods(self) -> int:
+        return self.window + 1
+
+    @property
+    def output_cols(self) -> list[str]:
+        if self.annualize:
+            return [f"realized_vol_{self.window}"]
+        return [f"raw_vol_{self.window}"]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -54,8 +65,13 @@ class ParkinsonVolatility(Feature):
     description = "Parkinson high-low volatility estimator"
 
     def __init__(self, window: int = 21, trading_days: int = 252) -> None:
+        _validate_window(window)
         self.window = window
         self.trading_days = trading_days
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -80,8 +96,13 @@ class GarmanKlassVolatility(Feature):
     description = "Garman-Klass OHLC volatility estimator"
 
     def __init__(self, window: int = 21, trading_days: int = 252) -> None:
+        _validate_window(window)
         self.window = window
         self.trading_days = trading_days
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -103,8 +124,13 @@ class BollingerBands(Feature):
     description = "Bollinger Bands (upper, middle, lower, %B, width)"
 
     def __init__(self, window: int = 20, num_std: float = 2.0) -> None:
+        _validate_window(window)
         self.window = window
         self.num_std = num_std
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -117,9 +143,9 @@ class BollingerBands(Feature):
         out[f"bb_upper_{w}"] = upper
         out[f"bb_lower_{w}"] = lower
         # %B: position within bands (0 = lower, 1 = upper)
-        out[f"bb_pct_{w}"] = (df[Columns.CLOSE] - lower) / (upper - lower)
+        out[f"bb_pct_{w}"] = safe_divide(df[Columns.CLOSE] - lower, upper - lower)
         # Bandwidth: normalised width of the bands
-        out[f"bb_width_{w}"] = (upper - lower) / sma
+        out[f"bb_width_{w}"] = safe_divide(upper - lower, sma)
         return out
 
 
@@ -135,7 +161,12 @@ class AverageTrueRange(Feature):
     description = "Average True Range (Wilder)"
 
     def __init__(self, window: int = 14) -> None:
+        _validate_window(window)
         self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return self.window + 1
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -151,7 +182,7 @@ class AverageTrueRange(Feature):
         col = f"atr_{self.window}"
         out[col] = tr.ewm(span=self.window, adjust=False).mean()
         # Normalised ATR (as % of close)
-        out[f"atr_pct_{self.window}"] = out[col] / df[Columns.CLOSE]
+        out[f"atr_pct_{self.window}"] = safe_divide(out[col], df[Columns.CLOSE])
         return out
 
 
@@ -168,6 +199,8 @@ class VolatilityRatio(Feature):
     description = "Short/long vol ratio"
 
     def __init__(self, short_window: int = 21, long_window: int = 63) -> None:
+        _validate_window(short_window, "short_window")
+        _validate_window(long_window, "long_window")
         self.short_window = short_window
         self.long_window = long_window
         self.required_cols = [
@@ -175,12 +208,16 @@ class VolatilityRatio(Feature):
             f"realized_vol_{self.long_window}",
         ]
 
+    @property
+    def min_periods(self) -> int:
+        return self.long_window + 1
+
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         short = df[f"realized_vol_{self.short_window}"]
         long_ = df[f"realized_vol_{self.long_window}"]
-        out["vol_ratio"] = short / long_
-        out["vol_ratio_zscore"] = (short - long_) / long_.rolling(self.long_window).std()
+        out["vol_ratio"] = safe_divide(short, long_)
+        out["vol_ratio_zscore"] = safe_divide(short - long_, long_.rolling(self.long_window).std())
         return out
 
 
@@ -198,6 +235,12 @@ class MovingTrueRange(Feature):
 
     def __init__(self, windows: list[int] | None = None) -> None:
         self.windows = windows or [20, 50, 200]
+        for w in self.windows:
+            _validate_window(w, "windows element")
+
+    @property
+    def min_periods(self) -> int:
+        return max(self.windows) + 1
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()

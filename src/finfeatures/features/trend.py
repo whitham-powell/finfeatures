@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures.core.base import Columns, Feature
+from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
 class SimpleMovingAverage(Feature):
@@ -24,13 +24,26 @@ class SimpleMovingAverage(Feature):
 
     def __init__(self, windows: list[int] | None = None) -> None:
         self.windows = windows or [10, 20, 50, 200]
+        for w in self.windows:
+            _validate_window(w, "windows element")
+
+    @property
+    def min_periods(self) -> int:
+        return max(self.windows)
+
+    @property
+    def output_cols(self) -> list[str]:
+        cols: list[str] = []
+        for w in self.windows:
+            cols.extend([f"sma_{w}", f"close_sma_{w}_ratio"])
+        return cols
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         for w in self.windows:
             ma = df[Columns.CLOSE].rolling(w).mean()
             out[f"sma_{w}"] = ma
-            out[f"close_sma_{w}_ratio"] = df[Columns.CLOSE] / ma - 1
+            out[f"close_sma_{w}_ratio"] = safe_divide(df[Columns.CLOSE], ma) - 1
         return out
 
 
@@ -45,6 +58,12 @@ class ExponentialMovingAverage(Feature):
 
     def __init__(self, windows: list[int] | None = None) -> None:
         self.windows = windows or [12, 26]
+        for w in self.windows:
+            _validate_window(w, "windows element")
+
+    @property
+    def min_periods(self) -> int:
+        return max(self.windows)
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -72,9 +91,29 @@ class MACD(Feature):
         slow: int = 26,
         signal: int = 9,
     ) -> None:
+        _validate_window(fast, "fast")
+        _validate_window(slow, "slow")
+        _validate_window(signal, "signal")
+        if fast >= slow:
+            raise ValueError(f"'fast' must be < 'slow', got fast={fast}, slow={slow}")
         self.fast = fast
         self.slow = slow
         self.signal = signal
+
+    @property
+    def min_periods(self) -> int:
+        return self.slow + self.signal
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [
+            "macd_line",
+            "macd_signal",
+            "macd_hist",
+            "macd_line_pct",
+            "macd_signal_pct",
+            "macd_hist_pct",
+        ]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -86,9 +125,9 @@ class MACD(Feature):
         out["macd_signal"] = signal_line
         out["macd_hist"] = macd_line - signal_line
         # Normalise by price for cross-asset comparability
-        out["macd_line_pct"] = macd_line / df[Columns.CLOSE]
-        out["macd_signal_pct"] = signal_line / df[Columns.CLOSE]
-        out["macd_hist_pct"] = out["macd_hist"] / df[Columns.CLOSE]
+        out["macd_line_pct"] = safe_divide(macd_line, df[Columns.CLOSE])
+        out["macd_signal_pct"] = safe_divide(signal_line, df[Columns.CLOSE])
+        out["macd_hist_pct"] = safe_divide(out["macd_hist"], df[Columns.CLOSE])
         return out
 
 
@@ -107,7 +146,12 @@ class TrendStrength(Feature):
     description = "ADX trend strength indicator"
 
     def __init__(self, window: int = 14) -> None:
+        _validate_window(window)
         self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return 2 * self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -133,9 +177,9 @@ class TrendStrength(Feature):
         plus_dm_s = pd.Series(plus_dm).ewm(span=w, adjust=False).mean()
         minus_dm_s = pd.Series(minus_dm).ewm(span=w, adjust=False).mean()
 
-        di_plus = 100 * plus_dm_s / atr_s
-        di_minus = 100 * minus_dm_s / atr_s
-        dx = 100 * (di_plus - di_minus).abs() / (di_plus + di_minus)
+        di_plus = safe_divide(100 * plus_dm_s, atr_s)
+        di_minus = safe_divide(100 * minus_dm_s, atr_s)
+        dx = safe_divide(100 * (di_plus - di_minus).abs(), di_plus + di_minus)
         adx = dx.ewm(span=w, adjust=False).mean()
 
         out[f"adx_{w}"] = adx.values
@@ -154,15 +198,21 @@ class MACrossover(Feature):
     description = "Fast/slow moving average crossover signal"
 
     def __init__(self, fast: int = 50, slow: int = 200) -> None:
+        _validate_window(fast, "fast")
+        _validate_window(slow, "slow")
         self.fast = fast
         self.slow = slow
         self.required_cols = [f"sma_{self.fast}", f"sma_{self.slow}"]
+
+    @property
+    def min_periods(self) -> int:
+        return self.slow
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         fast_col = f"sma_{self.fast}"
         slow_col = f"sma_{self.slow}"
         spread = df[fast_col] - df[slow_col]
-        out[f"ma_cross_{self.fast}_{self.slow}"] = spread / df[Columns.CLOSE]
+        out[f"ma_cross_{self.fast}_{self.slow}"] = safe_divide(spread, df[Columns.CLOSE])
         out[f"ma_cross_sign_{self.fast}_{self.slow}"] = np.sign(spread)
         return out

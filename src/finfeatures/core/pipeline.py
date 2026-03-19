@@ -68,6 +68,34 @@ class FeaturePipeline:
     # Core transform
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Introspection
+    # ------------------------------------------------------------------
+
+    @property
+    def min_periods(self) -> int:
+        """Maximum warm-up across all steps."""
+        return max((f.min_periods for f in self._steps), default=0)
+
+    # ------------------------------------------------------------------
+    # Dependency validation
+    # ------------------------------------------------------------------
+
+    def _validate_dependencies(self, input_cols: list[str]) -> None:
+        available = set(input_cols)
+        for feature in self._steps:
+            missing = [c for c in feature.required_cols if c not in available]
+            if missing:
+                raise ValueError(
+                    f"Feature '{feature.name}' requires columns {missing} not in input "
+                    f"and not produced by prior steps. Available: {sorted(available)}"
+                )
+            available.update(feature.output_cols)
+
+    # ------------------------------------------------------------------
+    # Core transform
+    # ------------------------------------------------------------------
+
     def transform(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Apply all features sequentially.
@@ -84,6 +112,12 @@ class FeaturePipeline:
             Columns are deduplicated; if two features write the same column
             the later one wins (with a warning).
         """
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise ValueError(
+                f"FeaturePipeline requires a DatetimeIndex, got {type(df.index).__name__}. "
+                f"Convert with: df.index = pd.to_datetime(df.index)"
+            )
+        self._validate_dependencies(list(df.columns))
         result = df.copy()
         raw_cols = list(df.columns)
 
@@ -109,10 +143,6 @@ class FeaturePipeline:
         """Apply the pipeline to a dict of {symbol: df}.  Returns same shape."""
         return {symbol: self.transform(df) for symbol, df in data.items()}
 
-    # ------------------------------------------------------------------
-    # Introspection
-    # ------------------------------------------------------------------
-
     @property
     def steps(self) -> list[Feature]:
         return list(self._steps)
@@ -130,6 +160,7 @@ class FeaturePipeline:
                     "name": f.name,
                     "class": f.__class__.__name__,
                     "required_cols": ", ".join(f.required_cols),
+                    "min_periods": f.min_periods,
                     "description": f.description,
                 }
                 for i, f in enumerate(self._steps)
@@ -256,5 +287,9 @@ def extended_pipeline() -> FeaturePipeline:
         RollingSkewKurt(column="log_return", window=126),
         DistributionShiftScore(column="log_return", window=21),
         DrawdownFeatures(),
-        CompositeScores(),
+        CompositeScores(
+            vol_col="realized_vol_21",
+            macd_col="macd_line",
+            rsi_col="rsi_14",
+        ),
     )

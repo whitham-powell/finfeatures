@@ -35,7 +35,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures.core.base import Columns, Feature
+from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
 class DistributionShiftScore(Feature):
@@ -65,10 +65,16 @@ class DistributionShiftScore(Feature):
         window: int = 21,
         n_bins: int = 10,
     ) -> None:
+        _validate_window(window)
+        _validate_window(n_bins, "n_bins", minimum=2)
         self.column = column
         self.window = window
         self.n_bins = n_bins
         self.required_cols = [self.column]
+
+    @property
+    def min_periods(self) -> int:
+        return 2 * self.window
 
     @staticmethod
     def _js_divergence(p: np.ndarray, q: np.ndarray, eps: float = 1e-10) -> float:
@@ -119,6 +125,10 @@ class DrawdownFeatures(Feature):
     required_cols = [Columns.CLOSE]
     description = "Drawdown depth, duration, and recovery"
 
+    @property
+    def min_periods(self) -> int:
+        return 2
+
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         close = df[Columns.CLOSE]
@@ -151,25 +161,46 @@ class CompositeScores(Feature):
 
     These are inputs, not labels — a downstream classifier thresholds them.
 
-    Requires upstream features: realized_vol_21, macd_line, rsi_14
+    Parameters
+    ----------
+    vol_col:  Name of the realised-volatility column (default: realized_vol_21)
+    macd_col: Name of the MACD line column (default: macd_line)
+    rsi_col:  Name of the RSI column (default: rsi_14)
     """
 
     name = "composite_scores"
     description = "Composite soft scores: stress, trend, momentum"
 
-    required_cols = ["realized_vol_21", "macd_line", "rsi_14"]
+    def __init__(
+        self,
+        vol_col: str = "realized_vol_21",
+        macd_col: str = "macd_line",
+        rsi_col: str = "rsi_14",
+    ) -> None:
+        self.vol_col = vol_col
+        self.macd_col = macd_col
+        self.rsi_col = rsi_col
+        self.required_cols = [vol_col, macd_col, rsi_col]
+
+    @property
+    def min_periods(self) -> int:
+        return 252
+
+    @property
+    def output_cols(self) -> list[str]:
+        return ["stress_score", "trend_score", "momentum_score_indicator"]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
 
-        vol = df["realized_vol_21"]
-        vol_z = (vol - vol.rolling(252).mean()) / vol.rolling(252).std()
+        vol = df[self.vol_col]
+        vol_z = safe_divide(vol - vol.rolling(252).mean(), vol.rolling(252).std())
         out["stress_score"] = 1 / (1 + np.exp(-vol_z))
 
-        macd = df["macd_line"]
-        macd_z = (macd - macd.rolling(252).mean()) / (macd.rolling(252).std() + 1e-10)
+        macd = df[self.macd_col]
+        macd_z = safe_divide(macd - macd.rolling(252).mean(), macd.rolling(252).std())
         out["trend_score"] = 1 / (1 + np.exp(-macd_z))
 
-        out["momentum_score_indicator"] = df["rsi_14"] / 100.0
+        out["momentum_score_indicator"] = df[self.rsi_col] / 100.0
 
         return out

@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures.core.base import Columns, Feature
+from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
 class VolumeFeatures(Feature):
@@ -25,7 +25,12 @@ class VolumeFeatures(Feature):
     description = "Volume return, z-score, and relative volume"
 
     def __init__(self, window: int = 20) -> None:
+        _validate_window(window)
         self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -33,8 +38,8 @@ class VolumeFeatures(Feature):
         out["volume_return"] = vol.pct_change()
         vol_sma = vol.rolling(self.window).mean()
         vol_std = vol.rolling(self.window).std()
-        out[f"volume_zscore_{self.window}"] = (vol - vol_sma) / vol_std
-        out[f"volume_rel_{self.window}"] = vol / vol_sma
+        out[f"volume_zscore_{self.window}"] = safe_divide(vol - vol_sma, vol_std)
+        out[f"volume_rel_{self.window}"] = safe_divide(vol, vol_sma)
         return out
 
 
@@ -67,15 +72,20 @@ class VWAP(Feature):
     description = "Rolling Volume-Weighted Average Price"
 
     def __init__(self, window: int = 20) -> None:
+        _validate_window(window)
         self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         tp = (df[Columns.HIGH] + df[Columns.LOW] + df[Columns.CLOSE]) / 3
         vol = df[Columns.VOLUME]
-        vwap = (tp * vol).rolling(self.window).sum() / vol.rolling(self.window).sum()
+        vwap = safe_divide((tp * vol).rolling(self.window).sum(), vol.rolling(self.window).sum())
         out[f"vwap_{self.window}"] = vwap
-        out[f"vwap_ratio_{self.window}"] = df[Columns.CLOSE] / vwap - 1
+        out[f"vwap_ratio_{self.window}"] = safe_divide(df[Columns.CLOSE], vwap) - 1
         return out
 
 
@@ -91,17 +101,23 @@ class ChaikinMoneyFlow(Feature):
     description = "Chaikin Money Flow"
 
     def __init__(self, window: int = 20) -> None:
+        _validate_window(window)
         self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         hl = df[Columns.HIGH] - df[Columns.LOW]
-        hl_safe = hl.replace(0, np.nan)
-        mf_multiplier = (
-            (df[Columns.CLOSE] - df[Columns.LOW]) - (df[Columns.HIGH] - df[Columns.CLOSE])
-        ) / hl_safe
+        mf_multiplier = safe_divide(
+            (df[Columns.CLOSE] - df[Columns.LOW]) - (df[Columns.HIGH] - df[Columns.CLOSE]),
+            hl,
+        )
         mfv = mf_multiplier * df[Columns.VOLUME]
-        out[f"cmf_{self.window}"] = (
-            mfv.rolling(self.window).sum() / df[Columns.VOLUME].rolling(self.window).sum()
+        out[f"cmf_{self.window}"] = safe_divide(
+            mfv.rolling(self.window).sum(),
+            df[Columns.VOLUME].rolling(self.window).sum(),
         )
         return out

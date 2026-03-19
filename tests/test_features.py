@@ -11,6 +11,7 @@ import pytest
 
 from finfeatures.core import Columns
 from finfeatures.features.composite import (
+    CompositeScores,
     DistributionShiftScore,
     DrawdownFeatures,
 )
@@ -514,3 +515,85 @@ class TestRollingVolatilityRaw:
         ann = RollingVolatility(window=21, annualize=True)(ohlcv_daily)
         ratio = ann["realized_vol_21"].dropna() / raw["raw_vol_21"].dropna()
         np.testing.assert_allclose(ratio.values, np.sqrt(252), rtol=1e-10)
+
+
+# ===========================================================================
+# Parameter validation (Item 3)
+# ===========================================================================
+
+
+class TestParameterValidation:
+    def test_window_zero_raises(self):
+        with pytest.raises(ValueError, match="integer >= 1"):
+            RollingVolatility(window=0)
+
+    def test_window_negative_raises(self):
+        with pytest.raises(ValueError, match="integer >= 1"):
+            RSI(window=-5)
+
+    def test_macd_fast_ge_slow_raises(self):
+        with pytest.raises(ValueError, match="fast.*<.*slow"):
+            MACD(fast=26, slow=12)
+
+
+# ===========================================================================
+# safe_divide edge cases (Item 2)
+# ===========================================================================
+
+
+class TestSafeDivideEdgeCases:
+    def test_bollinger_flat_price_no_inf(self):
+        """Constant close should produce NaN, not inf, for bb_pct and bb_width."""
+        dates = pd.date_range("2020-01-01", periods=50, freq="B")
+        df = pd.DataFrame(
+            {
+                "open": [100.0] * 50,
+                "high": [100.0] * 50,
+                "low": [100.0] * 50,
+                "close": [100.0] * 50,
+                "volume": [1000] * 50,
+            },
+            index=dates,
+        )
+        out = BollingerBands(window=20)(df)
+        assert not np.isinf(out["bb_pct_20"].dropna()).any()
+        assert not np.isinf(out["bb_width_20"].dropna()).any()
+
+    def test_stochastic_flat_range_no_inf(self):
+        """When high == low, stochastic should produce NaN, not inf."""
+        dates = pd.date_range("2020-01-01", periods=30, freq="B")
+        df = pd.DataFrame(
+            {
+                "open": [50.0] * 30,
+                "high": [50.0] * 30,
+                "low": [50.0] * 30,
+                "close": [50.0] * 30,
+                "volume": [1000] * 30,
+            },
+            index=dates,
+        )
+        out = StochasticOscillator(k_window=14)(df)
+        assert not np.isinf(out["stoch_k_14"].dropna()).any()
+
+
+# ===========================================================================
+# CompositeScores custom columns (Item 6)
+# ===========================================================================
+
+
+class TestCompositeScoresCustomColumns:
+    def test_custom_column_names(self, ohlcv_daily):
+        """CompositeScores should work with non-default column names."""
+        # Build a df with non-default column names for the required inputs
+        from finfeatures.features.price import Returns
+
+        out = Returns()(ohlcv_daily)
+        out["my_vol"] = out["close"].rolling(21).std()
+        out["my_macd"] = out["close"].ewm(span=12).mean() - out["close"].ewm(span=26).mean()
+        out["my_rsi"] = 50.0  # constant RSI for simplicity
+
+        cs = CompositeScores(vol_col="my_vol", macd_col="my_macd", rsi_col="my_rsi")
+        result = cs(out)
+        assert "stress_score" in result.columns
+        assert "trend_score" in result.columns
+        assert "momentum_score_indicator" in result.columns

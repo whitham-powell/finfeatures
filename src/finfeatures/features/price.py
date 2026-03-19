@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures.core.base import Columns, Feature
+from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
 class Returns(Feature):
@@ -19,6 +19,14 @@ class Returns(Feature):
     name = "returns"
     required_cols = [Columns.CLOSE]
     description = "Simple close-to-close returns"
+
+    @property
+    def min_periods(self) -> int:
+        return 2
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [Columns.RETURN]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -32,6 +40,14 @@ class LogReturns(Feature):
     name = "log_returns"
     required_cols = [Columns.CLOSE]
     description = "Log (continuously compounded) close-to-close returns"
+
+    @property
+    def min_periods(self) -> int:
+        return 2
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [Columns.LOG_RETURN]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -51,6 +67,10 @@ class LogTransform(Feature):
     name = "log_transform"
     required_cols = [Columns.OPEN, Columns.HIGH, Columns.LOW, Columns.CLOSE, Columns.VOLUME]
     description = "Log-transformed OHLCV columns"
+
+    @property
+    def output_cols(self) -> list[str]:
+        return ["log_open", "log_high", "log_low", "log_close", "log_volume"]
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
@@ -79,6 +99,10 @@ class CandleShape(Feature):
     required_cols = ["log_open", "log_high", "log_low", "log_close"]
     description = "Candle body, wicks, and close location value in log space"
 
+    @property
+    def output_cols(self) -> list[str]:
+        return ["body", "range", "upper_wick", "lower_wick", "CLV"]
+
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         log_o = df["log_open"]
@@ -91,7 +115,7 @@ class CandleShape(Feature):
         out["range"] = hl_range
         out["upper_wick"] = log_h - log_c
         out["lower_wick"] = log_c - log_l
-        out["CLV"] = (log_c - log_l) / hl_range.replace(0, np.nan)
+        out["CLV"] = safe_divide(log_c - log_l, hl_range)
         return out
 
 
@@ -157,13 +181,19 @@ class PriceRange(Feature):
     required_cols = [Columns.OPEN, Columns.HIGH, Columns.LOW, Columns.CLOSE]
     description = "Intraday and overnight range metrics"
 
+    @property
+    def min_periods(self) -> int:
+        return 2
+
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        out["high_low_range"] = (df[Columns.HIGH] - df[Columns.LOW]) / df[Columns.CLOSE]
-        out["open_close_range"] = (df[Columns.CLOSE] - df[Columns.OPEN]) / df[Columns.OPEN]
-        out["overnight_gap"] = (df[Columns.OPEN] - df[Columns.CLOSE].shift(1)) / df[
-            Columns.CLOSE
-        ].shift(1)
+        out["high_low_range"] = safe_divide(df[Columns.HIGH] - df[Columns.LOW], df[Columns.CLOSE])
+        out["open_close_range"] = safe_divide(
+            df[Columns.CLOSE] - df[Columns.OPEN], df[Columns.OPEN]
+        )
+        out["overnight_gap"] = safe_divide(
+            df[Columns.OPEN] - df[Columns.CLOSE].shift(1), df[Columns.CLOSE].shift(1)
+        )
         return out
 
 
@@ -211,13 +241,18 @@ class PriceRelativeToHigh(Feature):
     description = "Rolling distance from rolling high and low"
 
     def __init__(self, window: int = 52) -> None:
+        _validate_window(window)
         self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         w = self.window
         rolling_high = df[Columns.CLOSE].rolling(w).max()
         rolling_low = df[Columns.CLOSE].rolling(w).min()
-        out[f"pct_from_high_{w}"] = (df[Columns.CLOSE] - rolling_high) / rolling_high
-        out[f"pct_from_low_{w}"] = (df[Columns.CLOSE] - rolling_low) / rolling_low
+        out[f"pct_from_high_{w}"] = safe_divide(df[Columns.CLOSE] - rolling_high, rolling_high)
+        out[f"pct_from_low_{w}"] = safe_divide(df[Columns.CLOSE] - rolling_low, rolling_low)
         return out

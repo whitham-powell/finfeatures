@@ -10,7 +10,28 @@ from __future__ import annotations
 import abc
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
+import numpy as np
 import pandas as pd
+
+# ---------------------------------------------------------------------------
+# Validation / utility helpers
+# ---------------------------------------------------------------------------
+
+
+def _validate_window(value: int, name: str = "window", minimum: int = 1) -> None:
+    """Raise ValueError if *value* is not an int >= *minimum*."""
+    if not isinstance(value, int) or value < minimum:
+        raise ValueError(f"'{name}' must be an integer >= {minimum}, got {value!r}")
+
+
+def safe_divide(
+    numerator: pd.Series | np.ndarray,
+    denominator: pd.Series | np.ndarray,
+) -> pd.Series:
+    """Division returning NaN where denominator is zero or result is ±inf."""
+    result = numerator / pd.Series(denominator).replace(0, np.nan)
+    return result.replace([np.inf, -np.inf], np.nan)
+
 
 # ---------------------------------------------------------------------------
 # Column name constants — canonical OHLCV column names expected by all features
@@ -112,6 +133,20 @@ class Feature(abc.ABC):
             A new DataFrame containing all original columns plus the derived
             feature columns.
         """
+
+    # ------------------------------------------------------------------
+    # Introspection
+    # ------------------------------------------------------------------
+
+    @property
+    def min_periods(self) -> int:
+        """Minimum rows before this feature produces non-NaN output."""
+        return 0
+
+    @property
+    def output_cols(self) -> list[str]:
+        """Columns this feature adds. Override for dependency validation."""
+        return []
 
     # ------------------------------------------------------------------
     # Validation helpers
