@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from finfeatures.core._compat import HAS_TALIB, _f64, talib
 from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
@@ -162,4 +163,115 @@ class RollingCorrelation(Feature):
         out[f"corr_{self.col_a}_{self.col_b}_{self.window}"] = (
             df[self.col_a].rolling(self.window).corr(df[self.col_b])
         )
+        return out
+
+
+class CrossAssetCorrelation(Feature):
+    """
+    Rolling Pearson correlation between a column in the input DataFrame
+    and a column from an external reference asset's DataFrame.
+
+    The reference DataFrame is provided at construction time and aligned
+    by DatetimeIndex. Mismatched dates are forward-filled.
+
+    Output columns:
+      - Same column both sides: ``corr_{ref}_{col}_{w}``
+      - Different columns: ``corr_{ref}_{col}_vs_{ref_col}_{w}``
+    """
+
+    name = "cross_asset_correlation"
+    description = "Rolling correlation against an external reference asset"
+
+    def __init__(
+        self,
+        reference: pd.DataFrame,
+        reference_name: str,
+        column: str,
+        windows: int | list[int],
+        reference_column: str | None = None,
+    ) -> None:
+        if reference_column is None:
+            reference_column = column
+        if isinstance(windows, int):
+            windows = [windows]
+        for w in windows:
+            _validate_window(w, "windows element")
+        if reference_column not in reference.columns:
+            raise ValueError(
+                f"reference_column '{reference_column}' not found in reference DataFrame. "
+                f"Available: {list(reference.columns)}"
+            )
+        self.reference_name = reference_name
+        self.column = column
+        self.reference_column = reference_column
+        self.windows = windows
+        self.required_cols = [self.column]
+        # Store the aligned reference series
+        self._ref_series: pd.Series = reference[reference_column]  # type: ignore[type-arg]
+
+    @property
+    def min_periods(self) -> int:
+        return max(self.windows)
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [self._col_name(w) for w in self.windows]
+
+    def _col_name(self, w: int) -> str:
+        ref = self.reference_name
+        if self.column == self.reference_column:
+            return f"corr_{ref}_{self.column}_{w}"
+        return f"corr_{ref}_{self.column}_vs_{self.reference_column}_{w}"
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        primary = df[self.column]
+        # Align reference to the input's index, forward-fill gaps
+        ref_aligned = self._ref_series.reindex(primary.index, method="ffill")
+        for w in self.windows:
+            if HAS_TALIB:
+                out[self._col_name(w)] = talib.CORREL(
+                    _f64(primary), _f64(ref_aligned), timeperiod=w
+                )
+            else:
+                out[self._col_name(w)] = primary.rolling(w).corr(ref_aligned)
+        return out
+
+
+class LinearRegressionSlope(Feature):
+    """
+    Rolling linear regression slope.
+    Measures the trend direction and strength via least-squares fit.
+    """
+
+    name = "linreg_slope"
+    description = "Rolling linear regression slope"
+
+    def __init__(self, column: str = Columns.CLOSE, window: int = 14) -> None:
+        _validate_window(window, minimum=2)
+        self.column = column
+        self.window = window
+        self.required_cols = [self.column]
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"{self.column}_linreg_slope_{self.window}"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        col_name = f"{self.column}_linreg_slope_{self.window}"
+        vals = df[self.column]
+        if HAS_TALIB and self.column == Columns.CLOSE:
+            out[col_name] = talib.LINEARREG_SLOPE(_f64(vals), timeperiod=self.window)
+        else:
+            x = np.arange(self.window, dtype=float)
+            x_mean = x.mean()
+            x_var = ((x - x_mean) ** 2).sum()
+            out[col_name] = vals.rolling(self.window).apply(
+                lambda y: np.dot(y - y.mean(), x - x_mean) / x_var, raw=True
+            )
         return out

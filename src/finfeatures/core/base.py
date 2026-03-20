@@ -24,6 +24,43 @@ def _validate_window(value: int, name: str = "window", minimum: int = 1) -> None
         raise ValueError(f"'{name}' must be an integer >= {minimum}, got {value!r}")
 
 
+def _sma_seeded_ema(series: pd.Series, span: int) -> pd.Series:
+    """EMA matching TA-Lib: SMA of first *span* values as seed, then standard EMA.
+
+    pandas ``ewm(span=..., adjust=False)`` uses the first value as the seed,
+    producing a small but persistent offset from TA-Lib's output.  This helper
+    replicates TA-Lib's initialisation exactly.
+    """
+    alpha = 2.0 / (span + 1)
+    vals = series.values.astype(float)
+    n = len(vals)
+    out = np.full(n, np.nan)
+    if n < span:
+        return pd.Series(out, index=series.index)
+    out[span - 1] = np.mean(vals[:span])
+    for i in range(span, n):
+        out[i] = alpha * vals[i] + (1 - alpha) * out[i - 1]
+    return pd.Series(out, index=series.index)
+
+
+def _wilder_smooth(series: pd.Series, window: int) -> pd.Series:
+    """Wilder's smoothing matching TA-Lib: SMA seed then ``prev*(n-1)/n + cur/n``.
+
+    Used by RSI, ATR, ADX, and related Wilder-family indicators.
+    Equivalent to EMA with ``alpha=1/window`` but with an SMA seed.
+    """
+    alpha = 1.0 / window
+    vals = series.values.astype(float)
+    n = len(vals)
+    out = np.full(n, np.nan)
+    if n < window:
+        return pd.Series(out, index=series.index)
+    out[window - 1] = np.mean(vals[:window])
+    for i in range(window, n):
+        out[i] = alpha * vals[i] + (1 - alpha) * out[i - 1]
+    return pd.Series(out, index=series.index)
+
+
 def safe_divide(
     numerator: pd.Series | np.ndarray,
     denominator: pd.Series | np.ndarray,

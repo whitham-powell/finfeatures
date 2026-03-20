@@ -29,6 +29,7 @@ dependencies = ["pandas>=2.0", "numpy>=1.24", "scipy>=1.10"]
 [project.optional-dependencies]
 # Optional data source helpers — the core library requires none of these
 yfinance = ["yfinance>=0.2"]
+talib = ["TA-Lib>=0.6.0"]
 
 [project.urls]
 Homepage = "https://github.com/whitham-powell/finfeatures"
@@ -54,6 +55,7 @@ dev = [
     "mypy>=1.10",
     "pandas-stubs>=2.0",
     "yfinance>=0.2",
+    "TA-Lib>=0.6.0",
 ]
 
 # ── Ruff (lint + format) ──────────────────────────────────────────────────
@@ -75,14 +77,17 @@ warn_return_any = false
 warn_unused_configs = true
 
 [[tool.mypy.overrides]]
-module = ["pandas.*", "yfinance.*"]
+module = ["pandas.*", "yfinance.*", "talib.*"]
 ignore_missing_imports = true
 
 # ── Pytest ────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q --tb=short"
-markers = ["network: live network requests — skip with -m 'not network'"]
+markers = [
+    "network: live network requests — skip with -m 'not network'",
+    "talib: requires TA-Lib",
+]
 
 # ── Coverage ──────────────────────────────────────────────────────────────
 [tool.coverage.run]

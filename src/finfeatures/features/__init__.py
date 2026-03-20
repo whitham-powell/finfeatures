@@ -1,18 +1,35 @@
 # Import all feature modules so their classes auto-register via __init_subclass__
-from . import composite, momentum, price, statistical, trend, volatility, volume  # noqa: F401
+from . import (  # noqa: F401
+    composite,
+    momentum,
+    patterns,
+    price,
+    statistical,
+    trend,
+    volatility,
+    volume,
+)
 from .composite import (
     CompositeScores,
     DistributionShiftScore,
     DrawdownFeatures,
 )
 from .momentum import (
+    PPO,
     RSI,
+    TRIX,
+    Aroon,
+    ChandeMomentumOscillator,
     CommodityChannelIndex,
     MomentumScore,
+    MoneyFlowIndex,
     RateOfChange,
     StochasticOscillator,
+    StochasticRSI,
+    UltimateOscillator,
     WilliamsR,
 )
+from .patterns import CandlePatterns
 from .price import (
     CandleShape,
     CrossDay,
@@ -26,6 +43,8 @@ from .price import (
     TypicalPrice,
 )
 from .statistical import (
+    CrossAssetCorrelation,
+    LinearRegressionSlope,
     RollingAutocorrelation,
     RollingCorrelation,
     RollingMoments,
@@ -33,16 +52,24 @@ from .statistical import (
     RollingZScore,
 )
 from .trend import (
+    DEMA,
+    KAMA,
     MACD,
+    TEMA,
+    DonchianChannels,
     ExponentialMovingAverage,
+    IchimokuCloud,
     MACrossover,
+    ParabolicSAR,
     SimpleMovingAverage,
+    Supertrend,
     TrendStrength,
 )
 from .volatility import (
     AverageTrueRange,
     BollingerBands,
     GarmanKlassVolatility,
+    KeltnerChannels,
     MovingTrueRange,
     ParkinsonVolatility,
     RollingVolatility,
@@ -50,6 +77,8 @@ from .volatility import (
 )
 from .volume import (
     VWAP,
+    AccumulationDistribution,
+    ChaikinADOscillator,
     ChaikinMoneyFlow,
     OnBalanceVolume,
     VolumeFeatures,
@@ -75,12 +104,20 @@ __all__ = [
     "AverageTrueRange",
     "MovingTrueRange",
     "VolatilityRatio",
+    "KeltnerChannels",
     # trend
     "SimpleMovingAverage",
     "ExponentialMovingAverage",
     "MACD",
     "TrendStrength",
     "MACrossover",
+    "KAMA",
+    "ParabolicSAR",
+    "DEMA",
+    "TEMA",
+    "IchimokuCloud",
+    "DonchianChannels",
+    "Supertrend",
     # momentum
     "RSI",
     "RateOfChange",
@@ -88,17 +125,30 @@ __all__ = [
     "WilliamsR",
     "CommodityChannelIndex",
     "MomentumScore",
+    "MoneyFlowIndex",
+    "Aroon",
+    "ChandeMomentumOscillator",
+    "UltimateOscillator",
+    "StochasticRSI",
+    "TRIX",
+    "PPO",
     # volume
     "VolumeFeatures",
     "OnBalanceVolume",
     "VWAP",
     "ChaikinMoneyFlow",
+    "AccumulationDistribution",
+    "ChaikinADOscillator",
     # statistical
     "RollingZScore",
     "RollingSkewKurt",
     "RollingMoments",
     "RollingAutocorrelation",
     "RollingCorrelation",
+    "CrossAssetCorrelation",
+    "LinearRegressionSlope",
+    # patterns
+    "CandlePatterns",
     # composite
     "DistributionShiftScore",
     "DrawdownFeatures",

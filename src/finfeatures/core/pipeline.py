@@ -293,3 +293,50 @@ def extended_pipeline() -> FeaturePipeline:
             rsi_col="rsi_14",
         ),
     )
+
+
+def talib_pipeline() -> FeaturePipeline:
+    """
+    Preset showcasing TA-Lib-origin indicators.
+
+    Includes adaptive MAs (KAMA, DEMA, TEMA), Parabolic SAR, volume
+    indicators (AD, ADOSC), momentum oscillators (MFI, Aroon, CMO,
+    Ultimate Oscillator), linear regression slope, and candlestick
+    patterns.
+
+    Works with or without TA-Lib installed (falls back to pandas).
+    Designed to be composed with ``standard_pipeline()`` upstream::
+
+        full = standard_pipeline() + talib_pipeline()
+    """
+    from finfeatures.features.momentum import (
+        Aroon,
+        ChandeMomentumOscillator,
+        MoneyFlowIndex,
+        UltimateOscillator,
+    )
+    from finfeatures.features.patterns import CandlePatterns
+    from finfeatures.features.statistical import LinearRegressionSlope
+    from finfeatures.features.trend import DEMA, KAMA, TEMA, ParabolicSAR
+    from finfeatures.features.volume import AccumulationDistribution, ChaikinADOscillator
+
+    return FeaturePipeline(
+        # Adaptive moving averages
+        KAMA(window=10),
+        DEMA(windows=[10, 20]),
+        TEMA(windows=[10, 20]),
+        # Trend
+        ParabolicSAR(),
+        # Volume
+        AccumulationDistribution(),
+        ChaikinADOscillator(fast=3, slow=10),
+        # Momentum oscillators
+        MoneyFlowIndex(window=14),
+        Aroon(window=25),
+        ChandeMomentumOscillator(window=14),
+        UltimateOscillator(),
+        # Statistical
+        LinearRegressionSlope(column="close", window=14),
+        # Patterns
+        CandlePatterns(),
+    )

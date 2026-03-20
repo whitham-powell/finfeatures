@@ -10,7 +10,15 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
+from finfeatures.core._compat import HAS_TALIB, _f64, talib
+from finfeatures.core.base import (
+    Columns,
+    Feature,
+    _sma_seeded_ema,
+    _validate_window,
+    _wilder_smooth,
+    safe_divide,
+)
 
 
 class RollingVolatility(Feature):
@@ -135,15 +143,28 @@ class BollingerBands(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         w = self.window
-        sma = df[Columns.CLOSE].rolling(w).mean()
-        std = df[Columns.CLOSE].rolling(w).std()
-        upper = sma + self.num_std * std
-        lower = sma - self.num_std * std
+        close = df[Columns.CLOSE]
+        if HAS_TALIB:
+            upper_arr, middle_arr, lower_arr = talib.BBANDS(
+                _f64(close),
+                timeperiod=w,
+                nbdevup=self.num_std,
+                nbdevdn=self.num_std,
+                matype=0,  # type: ignore[arg-type]  # MA_Type.SMA
+            )
+            upper = pd.Series(upper_arr, index=close.index)
+            sma = pd.Series(middle_arr, index=close.index)
+            lower = pd.Series(lower_arr, index=close.index)
+        else:
+            sma = close.rolling(w).mean()
+            std = close.rolling(w).std(ddof=0)
+            upper = sma + self.num_std * std
+            lower = sma - self.num_std * std
         out[f"bb_middle_{w}"] = sma
         out[f"bb_upper_{w}"] = upper
         out[f"bb_lower_{w}"] = lower
         # %B: position within bands (0 = lower, 1 = upper)
-        out[f"bb_pct_{w}"] = safe_divide(df[Columns.CLOSE] - lower, upper - lower)
+        out[f"bb_pct_{w}"] = safe_divide(close - lower, upper - lower)
         # Bandwidth: normalised width of the bands
         out[f"bb_width_{w}"] = safe_divide(upper - lower, sma)
         return out
@@ -170,17 +191,25 @@ class AverageTrueRange(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        prev_close = df[Columns.CLOSE].shift(1)
-        tr = pd.concat(
-            [
-                df[Columns.HIGH] - df[Columns.LOW],
-                (df[Columns.HIGH] - prev_close).abs(),
-                (df[Columns.LOW] - prev_close).abs(),
-            ],
-            axis=1,
-        ).max(axis=1)
         col = f"atr_{self.window}"
-        out[col] = tr.ewm(span=self.window, adjust=False).mean()
+        if HAS_TALIB:
+            out[col] = talib.ATR(
+                _f64(df[Columns.HIGH]),
+                _f64(df[Columns.LOW]),
+                _f64(df[Columns.CLOSE]),
+                timeperiod=self.window,
+            )
+        else:
+            prev_close = df[Columns.CLOSE].shift(1)
+            tr = pd.concat(
+                [
+                    df[Columns.HIGH] - df[Columns.LOW],
+                    (df[Columns.HIGH] - prev_close).abs(),
+                    (df[Columns.LOW] - prev_close).abs(),
+                ],
+                axis=1,
+            ).max(axis=1)
+            out[col] = _wilder_smooth(tr.iloc[1:], self.window).reindex(df.index)
         # Normalised ATR (as % of close)
         out[f"atr_pct_{self.window}"] = safe_divide(out[col], df[Columns.CLOSE])
         return out
@@ -255,4 +284,76 @@ class MovingTrueRange(Feature):
         ).max(axis=1)
         for w in self.windows:
             out[f"mtr_{w}"] = tr.rolling(w).mean()
+        return out
+
+
+class KeltnerChannels(Feature):
+    """
+    Keltner Channels — EMA-based bands using ATR for width.
+
+    Similar to Bollinger Bands but uses ATR instead of standard deviation,
+    making it less sensitive to outliers. Often used with Bollinger Bands
+    to detect volatility squeezes.
+
+    Outputs:
+      - keltner_upper_N, keltner_mid_N, keltner_lower_N
+      - keltner_pct_N: position within bands (0 = lower, 1 = upper)
+    """
+
+    name = "keltner_channels"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE]
+    description = "Keltner Channels (EMA ± ATR multiplier)"
+
+    def __init__(self, window: int = 20, multiplier: float = 2.0) -> None:
+        _validate_window(window)
+        if multiplier <= 0:
+            raise ValueError(f"'multiplier' must be > 0, got {multiplier!r}")
+        self.window = window
+        self.multiplier = multiplier
+
+    @property
+    def min_periods(self) -> int:
+        return self.window + 1
+
+    @property
+    def output_cols(self) -> list[str]:
+        w = self.window
+        return [
+            f"keltner_upper_{w}",
+            f"keltner_mid_{w}",
+            f"keltner_lower_{w}",
+            f"keltner_pct_{w}",
+        ]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        w = self.window
+        close = df[Columns.CLOSE]
+
+        # Middle band: EMA of close
+        if HAS_TALIB:
+            mid = pd.Series(talib.EMA(_f64(close), timeperiod=w), index=close.index)
+            atr = pd.Series(
+                talib.ATR(_f64(df[Columns.HIGH]), _f64(df[Columns.LOW]), _f64(close), timeperiod=w),
+                index=close.index,
+            )
+        else:
+            mid = _sma_seeded_ema(close, w)
+            prev_close = close.shift(1)
+            tr = pd.concat(
+                [
+                    df[Columns.HIGH] - df[Columns.LOW],
+                    (df[Columns.HIGH] - prev_close).abs(),
+                    (df[Columns.LOW] - prev_close).abs(),
+                ],
+                axis=1,
+            ).max(axis=1)
+            atr = _wilder_smooth(tr.iloc[1:], w).reindex(df.index)
+
+        upper = mid + self.multiplier * atr
+        lower = mid - self.multiplier * atr
+        out[f"keltner_upper_{w}"] = upper
+        out[f"keltner_mid_{w}"] = mid
+        out[f"keltner_lower_{w}"] = lower
+        out[f"keltner_pct_{w}"] = safe_divide(close - lower, upper - lower)
         return out
