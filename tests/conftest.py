@@ -11,6 +11,21 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import finfeatures.core._compat as _compat_mod
+
+
+@pytest.fixture
+def skip_without_talib() -> None:
+    """Skip test if TA-Lib is not installed."""
+    if not _compat_mod.HAS_TALIB:
+        pytest.skip("TA-Lib not installed")
+
+
+@pytest.fixture
+def force_no_talib(monkeypatch: pytest.MonkeyPatch):
+    """Monkeypatch HAS_TALIB=False so the pandas fallback is tested."""
+    monkeypatch.setattr(_compat_mod, "HAS_TALIB", False)
+
 
 @pytest.fixture
 def ohlcv_daily() -> pd.DataFrame:

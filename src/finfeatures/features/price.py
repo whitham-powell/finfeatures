@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from finfeatures.core._compat import HAS_TALIB, _f64, talib
 from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
@@ -209,7 +210,14 @@ class TypicalPrice(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        out["typical_price"] = (df[Columns.HIGH] + df[Columns.LOW] + df[Columns.CLOSE]) / 3.0
+        if HAS_TALIB:
+            out["typical_price"] = talib.TYPPRICE(
+                _f64(df[Columns.HIGH]),
+                _f64(df[Columns.LOW]),
+                _f64(df[Columns.CLOSE]),
+            )
+        else:
+            out["typical_price"] = (df[Columns.HIGH] + df[Columns.LOW] + df[Columns.CLOSE]) / 3.0
         return out
 
 

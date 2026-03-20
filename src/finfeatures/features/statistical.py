@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from finfeatures.core._compat import HAS_TALIB, _f64, talib
 from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
@@ -162,4 +163,43 @@ class RollingCorrelation(Feature):
         out[f"corr_{self.col_a}_{self.col_b}_{self.window}"] = (
             df[self.col_a].rolling(self.window).corr(df[self.col_b])
         )
+        return out
+
+
+class LinearRegressionSlope(Feature):
+    """
+    Rolling linear regression slope.
+    Measures the trend direction and strength via least-squares fit.
+    """
+
+    name = "linreg_slope"
+    description = "Rolling linear regression slope"
+
+    def __init__(self, column: str = Columns.CLOSE, window: int = 14) -> None:
+        _validate_window(window, minimum=2)
+        self.column = column
+        self.window = window
+        self.required_cols = [self.column]
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"{self.column}_linreg_slope_{self.window}"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        col_name = f"{self.column}_linreg_slope_{self.window}"
+        vals = df[self.column]
+        if HAS_TALIB and self.column == Columns.CLOSE:
+            out[col_name] = talib.LINEARREG_SLOPE(_f64(vals), timeperiod=self.window)
+        else:
+            x = np.arange(self.window, dtype=float)
+            x_mean = x.mean()
+            x_var = ((x - x_mean) ** 2).sum()
+            out[col_name] = vals.rolling(self.window).apply(
+                lambda y: np.dot(y - y.mean(), x - x_mean) / x_var, raw=True
+            )
         return out

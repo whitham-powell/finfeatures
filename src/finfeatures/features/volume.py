@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from finfeatures.core._compat import HAS_TALIB, _f64, talib
 from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
@@ -55,8 +56,14 @@ class OnBalanceVolume(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        direction = np.sign(df[Columns.CLOSE].diff()).fillna(0)
-        out["obv"] = (direction * df[Columns.VOLUME]).cumsum()
+        if HAS_TALIB:
+            out["obv"] = talib.OBV(
+                _f64(df[Columns.CLOSE]),
+                _f64(df[Columns.VOLUME]),
+            )
+        else:
+            direction = np.sign(df[Columns.CLOSE].diff()).fillna(0)
+            out["obv"] = (direction * df[Columns.VOLUME]).cumsum()
         return out
 
 
@@ -120,4 +127,78 @@ class ChaikinMoneyFlow(Feature):
             mfv.rolling(self.window).sum(),
             df[Columns.VOLUME].rolling(self.window).sum(),
         )
+        return out
+
+
+class AccumulationDistribution(Feature):
+    """
+    Accumulation/Distribution Line.
+    AD = cumsum(CLV * volume) where CLV = ((C-L) - (H-C)) / (H-L).
+    """
+
+    name = "ad"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE, Columns.VOLUME]
+    description = "Accumulation/Distribution Line"
+
+    @property
+    def min_periods(self) -> int:
+        return 1
+
+    @property
+    def output_cols(self) -> list[str]:
+        return ["ad_line"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        h, lo, c, v = df[Columns.HIGH], df[Columns.LOW], df[Columns.CLOSE], df[Columns.VOLUME]
+        if HAS_TALIB:
+            out["ad_line"] = talib.AD(_f64(h), _f64(lo), _f64(c), _f64(v))
+        else:
+            clv = safe_divide((c - lo) - (h - c), h - lo)
+            out["ad_line"] = (clv * v).cumsum()
+        return out
+
+
+class ChaikinADOscillator(Feature):
+    """
+    Chaikin A/D Oscillator = EMA(AD, fast) - EMA(AD, slow).
+    """
+
+    name = "adosc"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE, Columns.VOLUME]
+    description = "Chaikin A/D Oscillator"
+
+    def __init__(self, fast: int = 3, slow: int = 10) -> None:
+        _validate_window(fast, "fast")
+        _validate_window(slow, "slow")
+        self.fast = fast
+        self.slow = slow
+
+    @property
+    def min_periods(self) -> int:
+        return self.slow + 1
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"adosc_{self.fast}_{self.slow}"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        h, lo, c, v = df[Columns.HIGH], df[Columns.LOW], df[Columns.CLOSE], df[Columns.VOLUME]
+        if HAS_TALIB:
+            out[f"adosc_{self.fast}_{self.slow}"] = talib.ADOSC(
+                _f64(h),
+                _f64(lo),
+                _f64(c),
+                _f64(v),
+                fastperiod=self.fast,
+                slowperiod=self.slow,
+            )
+        else:
+            clv = safe_divide((c - lo) - (h - c), h - lo)
+            ad = (clv * v).cumsum()
+            out[f"adosc_{self.fast}_{self.slow}"] = (
+                ad.ewm(span=self.fast, adjust=False).mean()
+                - ad.ewm(span=self.slow, adjust=False).mean()
+            )
         return out

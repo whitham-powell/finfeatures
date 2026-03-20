@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from finfeatures.core._compat import HAS_TALIB, _f64, talib
 from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
 
 
@@ -135,15 +136,28 @@ class BollingerBands(Feature):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
         w = self.window
-        sma = df[Columns.CLOSE].rolling(w).mean()
-        std = df[Columns.CLOSE].rolling(w).std()
-        upper = sma + self.num_std * std
-        lower = sma - self.num_std * std
+        close = df[Columns.CLOSE]
+        if HAS_TALIB:
+            upper_arr, middle_arr, lower_arr = talib.BBANDS(
+                _f64(close),
+                timeperiod=w,
+                nbdevup=self.num_std,
+                nbdevdn=self.num_std,
+                matype=0,  # type: ignore[arg-type]  # MA_Type.SMA
+            )
+            upper = pd.Series(upper_arr, index=close.index)
+            sma = pd.Series(middle_arr, index=close.index)
+            lower = pd.Series(lower_arr, index=close.index)
+        else:
+            sma = close.rolling(w).mean()
+            std = close.rolling(w).std()
+            upper = sma + self.num_std * std
+            lower = sma - self.num_std * std
         out[f"bb_middle_{w}"] = sma
         out[f"bb_upper_{w}"] = upper
         out[f"bb_lower_{w}"] = lower
         # %B: position within bands (0 = lower, 1 = upper)
-        out[f"bb_pct_{w}"] = safe_divide(df[Columns.CLOSE] - lower, upper - lower)
+        out[f"bb_pct_{w}"] = safe_divide(close - lower, upper - lower)
         # Bandwidth: normalised width of the bands
         out[f"bb_width_{w}"] = safe_divide(upper - lower, sma)
         return out
@@ -170,17 +184,25 @@ class AverageTrueRange(Feature):
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         out = df.copy()
-        prev_close = df[Columns.CLOSE].shift(1)
-        tr = pd.concat(
-            [
-                df[Columns.HIGH] - df[Columns.LOW],
-                (df[Columns.HIGH] - prev_close).abs(),
-                (df[Columns.LOW] - prev_close).abs(),
-            ],
-            axis=1,
-        ).max(axis=1)
         col = f"atr_{self.window}"
-        out[col] = tr.ewm(span=self.window, adjust=False).mean()
+        if HAS_TALIB:
+            out[col] = talib.ATR(
+                _f64(df[Columns.HIGH]),
+                _f64(df[Columns.LOW]),
+                _f64(df[Columns.CLOSE]),
+                timeperiod=self.window,
+            )
+        else:
+            prev_close = df[Columns.CLOSE].shift(1)
+            tr = pd.concat(
+                [
+                    df[Columns.HIGH] - df[Columns.LOW],
+                    (df[Columns.HIGH] - prev_close).abs(),
+                    (df[Columns.LOW] - prev_close).abs(),
+                ],
+                axis=1,
+            ).max(axis=1)
+            out[col] = tr.ewm(span=self.window, adjust=False).mean()
         # Normalised ATR (as % of close)
         out[f"atr_pct_{self.window}"] = safe_divide(out[col], df[Columns.CLOSE])
         return out

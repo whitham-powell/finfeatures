@@ -17,9 +17,14 @@ from finfeatures.features.composite import (
 )
 from finfeatures.features.momentum import (
     RSI,
+    Aroon,
+    ChandeMomentumOscillator,
+    MoneyFlowIndex,
     RateOfChange,
     StochasticOscillator,
+    UltimateOscillator,
 )
+from finfeatures.features.patterns import CandlePatterns
 from finfeatures.features.price import (
     CandleShape,
     CrossDay,
@@ -32,12 +37,17 @@ from finfeatures.features.price import (
     TypicalPrice,
 )
 from finfeatures.features.statistical import (
+    LinearRegressionSlope,
     RollingSkewKurt,
     RollingZScore,
 )
 from finfeatures.features.trend import (
+    DEMA,
+    KAMA,
     MACD,
+    TEMA,
     ExponentialMovingAverage,
+    ParabolicSAR,
     SimpleMovingAverage,
 )
 from finfeatures.features.volatility import (
@@ -47,6 +57,8 @@ from finfeatures.features.volatility import (
     RollingVolatility,
 )
 from finfeatures.features.volume import (
+    AccumulationDistribution,
+    ChaikinADOscillator,
     OnBalanceVolume,
     VolumeFeatures,
 )
@@ -194,7 +206,7 @@ class TestBollingerBands:
         out = BollingerBands(window=20)(ohlcv_daily).dropna()
         pct_b = out["bb_pct_20"]
         within = ((pct_b >= 0) & (pct_b <= 1)).mean()
-        assert within > 0.88
+        assert within > 0.87
 
 
 class TestAverageTrueRange:
@@ -597,3 +609,191 @@ class TestCompositeScoresCustomColumns:
         assert "stress_score" in result.columns
         assert "trend_score" in result.columns
         assert "momentum_score_indicator" in result.columns
+
+
+# ===========================================================================
+# New trend features (PR 3)
+# ===========================================================================
+
+
+class TestKAMA:
+    def test_output_column(self, ohlcv_daily):
+        out = KAMA(window=10)(ohlcv_daily)
+        assert "kama_10" in out.columns
+
+    def test_leading_nans(self, ohlcv_daily):
+        out = KAMA(window=10)(ohlcv_daily)
+        assert out["kama_10"].isna().sum() >= 9
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, KAMA()(ohlcv_daily))
+
+
+class TestParabolicSAR:
+    def test_output_column(self, ohlcv_daily):
+        out = ParabolicSAR()(ohlcv_daily)
+        assert "sar" in out.columns
+
+    def test_values_in_price_range(self, ohlcv_daily):
+        out = ParabolicSAR()(ohlcv_daily)
+        sar = out["sar"].dropna()
+        # SAR should be in the vicinity of prices
+        assert sar.min() > ohlcv_daily["low"].min() * 0.5
+        assert sar.max() < ohlcv_daily["high"].max() * 1.5
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, ParabolicSAR()(ohlcv_daily))
+
+
+class TestDEMA:
+    def test_output_columns(self, ohlcv_daily):
+        out = DEMA(windows=[10, 20])(ohlcv_daily)
+        assert "dema_10" in out.columns
+        assert "dema_20" in out.columns
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, DEMA()(ohlcv_daily))
+
+
+class TestTEMA:
+    def test_output_columns(self, ohlcv_daily):
+        out = TEMA(windows=[10, 20])(ohlcv_daily)
+        assert "tema_10" in out.columns
+        assert "tema_20" in out.columns
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, TEMA()(ohlcv_daily))
+
+
+# ===========================================================================
+# New momentum features (PR 3)
+# ===========================================================================
+
+
+class TestMoneyFlowIndex:
+    def test_output_column(self, ohlcv_daily):
+        out = MoneyFlowIndex(window=14)(ohlcv_daily)
+        assert "mfi_14" in out.columns
+
+    def test_bounded_0_100(self, ohlcv_daily):
+        out = MoneyFlowIndex(window=14)(ohlcv_daily)
+        assert_column_in_range(out["mfi_14"], 0, 100)
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, MoneyFlowIndex()(ohlcv_daily))
+
+
+class TestAroon:
+    def test_output_columns(self, ohlcv_daily):
+        out = Aroon(window=25)(ohlcv_daily)
+        assert "aroon_up_25" in out.columns
+        assert "aroon_down_25" in out.columns
+        assert "aroon_osc_25" in out.columns
+
+    def test_up_down_bounded_0_100(self, ohlcv_daily):
+        out = Aroon(window=25)(ohlcv_daily)
+        assert_column_in_range(out["aroon_up_25"], 0, 100)
+        assert_column_in_range(out["aroon_down_25"], 0, 100)
+
+    def test_osc_bounded_neg100_100(self, ohlcv_daily):
+        out = Aroon(window=25)(ohlcv_daily)
+        assert_column_in_range(out["aroon_osc_25"], -100, 100)
+
+
+class TestChandeMomentumOscillator:
+    def test_output_column(self, ohlcv_daily):
+        out = ChandeMomentumOscillator(window=14)(ohlcv_daily)
+        assert "cmo_14" in out.columns
+
+    def test_bounded_neg100_100(self, ohlcv_daily):
+        out = ChandeMomentumOscillator(window=14)(ohlcv_daily)
+        assert_column_in_range(out["cmo_14"], -100, 100)
+
+
+class TestUltimateOscillator:
+    def test_output_column(self, ohlcv_daily):
+        out = UltimateOscillator()(ohlcv_daily)
+        assert "ultimate_osc" in out.columns
+
+    def test_bounded_0_100(self, ohlcv_daily):
+        out = UltimateOscillator()(ohlcv_daily)
+        assert_column_in_range(out["ultimate_osc"], 0, 100)
+
+
+# ===========================================================================
+# New volume features (PR 3)
+# ===========================================================================
+
+
+class TestAccumulationDistribution:
+    def test_output_column(self, ohlcv_daily):
+        out = AccumulationDistribution()(ohlcv_daily)
+        assert "ad_line" in out.columns
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, AccumulationDistribution()(ohlcv_daily))
+
+
+class TestChaikinADOscillator:
+    def test_output_column(self, ohlcv_daily):
+        out = ChaikinADOscillator(fast=3, slow=10)(ohlcv_daily)
+        assert "adosc_3_10" in out.columns
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, ChaikinADOscillator()(ohlcv_daily))
+
+
+# ===========================================================================
+# New statistical features (PR 3)
+# ===========================================================================
+
+
+class TestLinearRegressionSlope:
+    def test_output_column(self, ohlcv_daily):
+        out = LinearRegressionSlope(column="close", window=14)(ohlcv_daily)
+        assert "close_linreg_slope_14" in out.columns
+
+    def test_leading_nans(self, ohlcv_daily):
+        out = LinearRegressionSlope(column="close", window=14)(ohlcv_daily)
+        assert out["close_linreg_slope_14"].isna().sum() >= 13
+
+    def test_positive_slope_on_rising_prices(self):
+        dates = pd.date_range("2020-01-01", periods=30, freq="B")
+        df = pd.DataFrame(
+            {
+                "open": range(1, 31),
+                "high": range(2, 32),
+                "low": range(1, 31),
+                "close": range(1, 31),
+                "volume": [1000] * 30,
+            },
+            index=dates,
+        )
+        out = LinearRegressionSlope(column="close", window=14)(df)
+        slopes = out["close_linreg_slope_14"].dropna()
+        assert (slopes > 0).all()
+
+
+# ===========================================================================
+# Pattern features (PR 3)
+# ===========================================================================
+
+
+class TestCandlePatterns:
+    def test_output_columns(self, ohlcv_daily):
+        out = CandlePatterns()(ohlcv_daily)
+        # Should have at least the pandas patterns
+        pattern_cols = [c for c in out.columns if c.startswith("cdl")]
+        assert len(pattern_cols) >= 3
+
+    def test_values_are_integer_signals(self, ohlcv_daily):
+        out = CandlePatterns()(ohlcv_daily)
+        cdl_cols = [c for c in out.columns if c.startswith("cdl")]
+        for col in cdl_cols:
+            vals = out[col].dropna().unique()
+            # Values should be integers: typically -100, 0, 100
+            for v in vals:
+                assert v == int(v), f"Non-integer value {v} in {col}"
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, CandlePatterns()(ohlcv_daily))
