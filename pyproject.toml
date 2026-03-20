@@ -1,6 +1,6 @@
 [project]
 name = "finfeatures"
-version = "0.1.0"
+version = "0.2.0"
 description = "Source-agnostic financial timeseries feature library"
 readme = "README.md"
 license = { text = "MIT" }
