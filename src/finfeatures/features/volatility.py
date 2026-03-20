@@ -278,3 +278,75 @@ class MovingTrueRange(Feature):
         for w in self.windows:
             out[f"mtr_{w}"] = tr.rolling(w).mean()
         return out
+
+
+class KeltnerChannels(Feature):
+    """
+    Keltner Channels — EMA-based bands using ATR for width.
+
+    Similar to Bollinger Bands but uses ATR instead of standard deviation,
+    making it less sensitive to outliers. Often used with Bollinger Bands
+    to detect volatility squeezes.
+
+    Outputs:
+      - keltner_upper_N, keltner_mid_N, keltner_lower_N
+      - keltner_pct_N: position within bands (0 = lower, 1 = upper)
+    """
+
+    name = "keltner_channels"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE]
+    description = "Keltner Channels (EMA ± ATR multiplier)"
+
+    def __init__(self, window: int = 20, multiplier: float = 2.0) -> None:
+        _validate_window(window)
+        if multiplier <= 0:
+            raise ValueError(f"'multiplier' must be > 0, got {multiplier!r}")
+        self.window = window
+        self.multiplier = multiplier
+
+    @property
+    def min_periods(self) -> int:
+        return self.window + 1
+
+    @property
+    def output_cols(self) -> list[str]:
+        w = self.window
+        return [
+            f"keltner_upper_{w}",
+            f"keltner_mid_{w}",
+            f"keltner_lower_{w}",
+            f"keltner_pct_{w}",
+        ]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        w = self.window
+        close = df[Columns.CLOSE]
+
+        # Middle band: EMA of close
+        if HAS_TALIB:
+            mid = pd.Series(talib.EMA(_f64(close), timeperiod=w), index=close.index)
+            atr = pd.Series(
+                talib.ATR(_f64(df[Columns.HIGH]), _f64(df[Columns.LOW]), _f64(close), timeperiod=w),
+                index=close.index,
+            )
+        else:
+            mid = close.ewm(span=w, adjust=False).mean()
+            prev_close = close.shift(1)
+            tr = pd.concat(
+                [
+                    df[Columns.HIGH] - df[Columns.LOW],
+                    (df[Columns.HIGH] - prev_close).abs(),
+                    (df[Columns.LOW] - prev_close).abs(),
+                ],
+                axis=1,
+            ).max(axis=1)
+            atr = tr.ewm(span=w, adjust=False).mean()
+
+        upper = mid + self.multiplier * atr
+        lower = mid - self.multiplier * atr
+        out[f"keltner_upper_{w}"] = upper
+        out[f"keltner_mid_{w}"] = mid
+        out[f"keltner_lower_{w}"] = lower
+        out[f"keltner_pct_{w}"] = safe_divide(close - lower, upper - lower)
+        return out

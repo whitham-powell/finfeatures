@@ -15,7 +15,9 @@ from .composite import (
     DrawdownFeatures,
 )
 from .momentum import (
+    PPO,
     RSI,
+    TRIX,
     Aroon,
     ChandeMomentumOscillator,
     CommodityChannelIndex,
@@ -23,6 +25,7 @@ from .momentum import (
     MoneyFlowIndex,
     RateOfChange,
     StochasticOscillator,
+    StochasticRSI,
     UltimateOscillator,
     WilliamsR,
 )
@@ -53,16 +56,20 @@ from .trend import (
     KAMA,
     MACD,
     TEMA,
+    DonchianChannels,
     ExponentialMovingAverage,
+    IchimokuCloud,
     MACrossover,
     ParabolicSAR,
     SimpleMovingAverage,
+    Supertrend,
     TrendStrength,
 )
 from .volatility import (
     AverageTrueRange,
     BollingerBands,
     GarmanKlassVolatility,
+    KeltnerChannels,
     MovingTrueRange,
     ParkinsonVolatility,
     RollingVolatility,
@@ -97,6 +104,7 @@ __all__ = [
     "AverageTrueRange",
     "MovingTrueRange",
     "VolatilityRatio",
+    "KeltnerChannels",
     # trend
     "SimpleMovingAverage",
     "ExponentialMovingAverage",
@@ -107,6 +115,9 @@ __all__ = [
     "ParabolicSAR",
     "DEMA",
     "TEMA",
+    "IchimokuCloud",
+    "DonchianChannels",
+    "Supertrend",
     # momentum
     "RSI",
     "RateOfChange",
@@ -118,6 +129,9 @@ __all__ = [
     "Aroon",
     "ChandeMomentumOscillator",
     "UltimateOscillator",
+    "StochasticRSI",
+    "TRIX",
+    "PPO",
     # volume
     "VolumeFeatures",
     "OnBalanceVolume",

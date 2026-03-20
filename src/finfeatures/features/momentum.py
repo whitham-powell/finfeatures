@@ -404,3 +404,147 @@ class UltimateOscillator(Feature):
             avg3 = safe_divide(bp.rolling(self.period3).sum(), tr.rolling(self.period3).sum())
             out["ultimate_osc"] = 100 * (4 * avg1 + 2 * avg2 + avg3) / 7
         return out
+
+
+class StochasticRSI(Feature):
+    """
+    Stochastic RSI — RSI run through the stochastic formula.
+    Ranges 0-100. More sensitive than plain RSI.
+
+    Outputs: stochrsi_k_N, stochrsi_d_N
+    """
+
+    name = "stochastic_rsi"
+    required_cols = [Columns.CLOSE]
+    description = "Stochastic RSI"
+
+    def __init__(
+        self,
+        window: int = 14,
+        k_period: int = 5,
+        d_period: int = 3,
+    ) -> None:
+        _validate_window(window)
+        _validate_window(k_period, "k_period")
+        _validate_window(d_period, "d_period")
+        self.window = window
+        self.k_period = k_period
+        self.d_period = d_period
+
+    @property
+    def min_periods(self) -> int:
+        return self.window + self.k_period + self.d_period
+
+    @property
+    def output_cols(self) -> list[str]:
+        w = self.window
+        return [f"stochrsi_k_{w}", f"stochrsi_d_{w}"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        close = df[Columns.CLOSE]
+        w = self.window
+        if HAS_TALIB:
+            fastk, fastd = talib.STOCHRSI(
+                _f64(close),
+                timeperiod=w,
+                fastk_period=self.k_period,
+                fastd_period=self.d_period,
+                fastd_matype=0,  # type: ignore[arg-type]  # MA_Type.SMA
+            )
+            out[f"stochrsi_k_{w}"] = fastk
+            out[f"stochrsi_d_{w}"] = fastd
+        else:
+            # Compute RSI first
+            delta = close.diff()
+            gain = delta.clip(lower=0)
+            loss = (-delta).clip(lower=0)
+            avg_gain = gain.ewm(alpha=1 / w, adjust=False).mean()
+            avg_loss = loss.ewm(alpha=1 / w, adjust=False).mean()
+            rs = safe_divide(avg_gain, avg_loss)
+            rsi = 100 - (100 / (1 + rs))
+            # Apply stochastic formula to RSI
+            rsi_min = rsi.rolling(self.k_period).min()
+            rsi_max = rsi.rolling(self.k_period).max()
+            stoch_k = 100 * safe_divide(rsi - rsi_min, rsi_max - rsi_min)
+            out[f"stochrsi_k_{w}"] = stoch_k
+            out[f"stochrsi_d_{w}"] = stoch_k.rolling(self.d_period).mean()
+        return out
+
+
+class TRIX(Feature):
+    """
+    TRIX — 1-day rate of change of a triple-smoothed EMA.
+    Good noise filter; oscillates around zero.
+    """
+
+    name = "trix"
+    required_cols = [Columns.CLOSE]
+    description = "Triple-smoothed EMA rate of change"
+
+    def __init__(self, window: int = 30) -> None:
+        _validate_window(window)
+        self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return 3 * self.window
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"trix_{self.window}"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        close = df[Columns.CLOSE]
+        if HAS_TALIB:
+            out[f"trix_{self.window}"] = talib.TRIX(_f64(close), timeperiod=self.window)
+        else:
+            ema1 = close.ewm(span=self.window, adjust=False).mean()
+            ema2 = ema1.ewm(span=self.window, adjust=False).mean()
+            ema3 = ema2.ewm(span=self.window, adjust=False).mean()
+            out[f"trix_{self.window}"] = ema3.pct_change() * 100
+        return out
+
+
+class PPO(Feature):
+    """
+    Percentage Price Oscillator — MACD expressed as a percentage.
+    PPO = (EMA_fast - EMA_slow) / EMA_slow * 100
+    """
+
+    name = "ppo"
+    required_cols = [Columns.CLOSE]
+    description = "Percentage Price Oscillator"
+
+    def __init__(self, fast: int = 12, slow: int = 26) -> None:
+        _validate_window(fast, "fast")
+        _validate_window(slow, "slow")
+        if fast >= slow:
+            raise ValueError(f"'fast' must be < 'slow', got fast={fast}, slow={slow}")
+        self.fast = fast
+        self.slow = slow
+
+    @property
+    def min_periods(self) -> int:
+        return self.slow
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"ppo_{self.fast}_{self.slow}"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        close = df[Columns.CLOSE]
+        if HAS_TALIB:
+            out[f"ppo_{self.fast}_{self.slow}"] = talib.PPO(
+                _f64(close),
+                fastperiod=self.fast,
+                slowperiod=self.slow,
+                matype=0,  # type: ignore[arg-type]  # MA_Type.SMA
+            )
+        else:
+            ema_fast = close.ewm(span=self.fast, adjust=False).mean()
+            ema_slow = close.ewm(span=self.slow, adjust=False).mean()
+            out[f"ppo_{self.fast}_{self.slow}"] = safe_divide(100 * (ema_fast - ema_slow), ema_slow)
+        return out

@@ -450,3 +450,191 @@ class TEMA(Feature):
                 ema3 = ema2.ewm(span=w, adjust=False).mean()
                 out[f"tema_{w}"] = 3 * ema1 - 3 * ema2 + ema3
         return out
+
+
+class IchimokuCloud(Feature):
+    """
+    Ichimoku Kinko Hyo — trend direction, support/resistance, and momentum.
+
+    Components:
+      - tenkan_sen:   midpoint of (highest high + lowest low) over tenkan period
+      - kijun_sen:    midpoint over kijun period
+      - senkou_a:     midpoint of tenkan + kijun, shifted forward
+      - senkou_b:     midpoint over senkou period, shifted forward
+      - chikou_span:  close shifted backward
+    """
+
+    name = "ichimoku"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE]
+    description = "Ichimoku Cloud"
+
+    def __init__(
+        self,
+        tenkan: int = 9,
+        kijun: int = 26,
+        senkou: int = 52,
+    ) -> None:
+        _validate_window(tenkan, "tenkan")
+        _validate_window(kijun, "kijun")
+        _validate_window(senkou, "senkou")
+        self.tenkan = tenkan
+        self.kijun = kijun
+        self.senkou = senkou
+
+    @property
+    def min_periods(self) -> int:
+        return self.senkou + self.kijun
+
+    @property
+    def output_cols(self) -> list[str]:
+        return ["tenkan_sen", "kijun_sen", "senkou_a", "senkou_b", "chikou_span"]
+
+    @staticmethod
+    def _midpoint(high: pd.Series, low: pd.Series, window: int) -> pd.Series:
+        return (high.rolling(window).max() + low.rolling(window).min()) / 2
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        high, low, close = df[Columns.HIGH], df[Columns.LOW], df[Columns.CLOSE]
+        tenkan = self._midpoint(high, low, self.tenkan)
+        kijun = self._midpoint(high, low, self.kijun)
+        out["tenkan_sen"] = tenkan
+        out["kijun_sen"] = kijun
+        out["senkou_a"] = ((tenkan + kijun) / 2).shift(self.kijun)
+        out["senkou_b"] = self._midpoint(high, low, self.senkou).shift(self.kijun)
+        out["chikou_span"] = close.shift(-self.kijun)
+        return out
+
+
+class DonchianChannels(Feature):
+    """
+    Donchian Channels — N-period high/low breakout bands.
+
+    Outputs:
+      - donchian_upper_N: highest high over window
+      - donchian_lower_N: lowest low over window
+      - donchian_mid_N:   midpoint of upper and lower
+      - donchian_width_N: (upper - lower) / mid, normalised width
+    """
+
+    name = "donchian_channels"
+    required_cols = [Columns.HIGH, Columns.LOW]
+    description = "Donchian Channels (N-period high/low breakout)"
+
+    def __init__(self, window: int = 20) -> None:
+        _validate_window(window)
+        self.window = window
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
+
+    @property
+    def output_cols(self) -> list[str]:
+        w = self.window
+        return [
+            f"donchian_upper_{w}",
+            f"donchian_lower_{w}",
+            f"donchian_mid_{w}",
+            f"donchian_width_{w}",
+        ]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        w = self.window
+        upper = df[Columns.HIGH].rolling(w).max()
+        lower = df[Columns.LOW].rolling(w).min()
+        mid = (upper + lower) / 2
+        out[f"donchian_upper_{w}"] = upper
+        out[f"donchian_lower_{w}"] = lower
+        out[f"donchian_mid_{w}"] = mid
+        out[f"donchian_width_{w}"] = safe_divide(upper - lower, mid)
+        return out
+
+
+class Supertrend(Feature):
+    """
+    Supertrend — ATR-based trend-following indicator.
+
+    Outputs:
+      - supertrend: the trailing stop level
+      - supertrend_dir: +1 (uptrend) or -1 (downtrend)
+    """
+
+    name = "supertrend"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE]
+    description = "Supertrend (ATR-based trend follower)"
+
+    def __init__(self, window: int = 10, multiplier: float = 3.0) -> None:
+        _validate_window(window)
+        if multiplier <= 0:
+            raise ValueError(f"'multiplier' must be > 0, got {multiplier!r}")
+        self.window = window
+        self.multiplier = multiplier
+
+    @property
+    def min_periods(self) -> int:
+        return self.window + 1
+
+    @property
+    def output_cols(self) -> list[str]:
+        return ["supertrend", "supertrend_dir"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        high, low, close = df[Columns.HIGH], df[Columns.LOW], df[Columns.CLOSE]
+        hl2 = (high + low) / 2
+
+        # ATR calculation
+        prev_close = close.shift(1)
+        tr = pd.concat(
+            [high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1
+        ).max(axis=1)
+        atr = tr.ewm(span=self.window, adjust=False).mean()
+
+        basic_upper = hl2 + self.multiplier * atr
+        basic_lower = hl2 - self.multiplier * atr
+
+        n = len(df)
+        upper = np.full(n, np.nan)
+        lower = np.full(n, np.nan)
+        direction = np.ones(n)
+        st = np.full(n, np.nan)
+
+        upper[0] = basic_upper.iloc[0]
+        lower[0] = basic_lower.iloc[0]
+
+        c = close.values.astype(float)
+        bu = basic_upper.values.astype(float)
+        bl = basic_lower.values.astype(float)
+
+        for i in range(1, n):
+            # Final upper band: lower of basic_upper and prev upper (if prev close <= prev upper)
+            if bu[i] < upper[i - 1] or c[i - 1] > upper[i - 1]:
+                upper[i] = bu[i]
+            else:
+                upper[i] = upper[i - 1]
+
+            # Final lower band: higher of basic_lower and prev lower (if prev close >= prev lower)
+            if bl[i] > lower[i - 1] or c[i - 1] < lower[i - 1]:
+                lower[i] = bl[i]
+            else:
+                lower[i] = lower[i - 1]
+
+            # Direction
+            if direction[i - 1] == 1:  # was uptrend
+                if c[i] < lower[i]:
+                    direction[i] = -1
+                else:
+                    direction[i] = 1
+            else:  # was downtrend
+                if c[i] > upper[i]:
+                    direction[i] = 1
+                else:
+                    direction[i] = -1
+
+            st[i] = lower[i] if direction[i] == 1 else upper[i]
+
+        out["supertrend"] = st
+        out["supertrend_dir"] = direction
+        return out

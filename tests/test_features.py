@@ -16,12 +16,15 @@ from finfeatures.features.composite import (
     DrawdownFeatures,
 )
 from finfeatures.features.momentum import (
+    PPO,
     RSI,
+    TRIX,
     Aroon,
     ChandeMomentumOscillator,
     MoneyFlowIndex,
     RateOfChange,
     StochasticOscillator,
+    StochasticRSI,
     UltimateOscillator,
 )
 from finfeatures.features.patterns import CandlePatterns
@@ -47,13 +50,17 @@ from finfeatures.features.trend import (
     KAMA,
     MACD,
     TEMA,
+    DonchianChannels,
     ExponentialMovingAverage,
+    IchimokuCloud,
     ParabolicSAR,
     SimpleMovingAverage,
+    Supertrend,
 )
 from finfeatures.features.volatility import (
     AverageTrueRange,
     BollingerBands,
+    KeltnerChannels,
     MovingTrueRange,
     RollingVolatility,
 )
@@ -666,6 +673,53 @@ class TestTEMA:
         assert_raw_cols_preserved(ohlcv_daily, TEMA()(ohlcv_daily))
 
 
+class TestIchimokuCloud:
+    def test_output_columns(self, ohlcv_daily):
+        out = IchimokuCloud()(ohlcv_daily)
+        for col in ["tenkan_sen", "kijun_sen", "senkou_a", "senkou_b", "chikou_span"]:
+            assert col in out.columns
+
+    def test_tenkan_between_high_low(self, ohlcv_daily):
+        out = IchimokuCloud()(ohlcv_daily)
+        valid = out["tenkan_sen"].dropna()
+        assert (valid >= ohlcv_daily.loc[valid.index, "low"].min()).all()
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, IchimokuCloud()(ohlcv_daily))
+
+
+class TestDonchianChannels:
+    def test_output_columns(self, ohlcv_daily):
+        out = DonchianChannels(window=20)(ohlcv_daily)
+        assert "donchian_upper_20" in out.columns
+        assert "donchian_lower_20" in out.columns
+        assert "donchian_mid_20" in out.columns
+        assert "donchian_width_20" in out.columns
+
+    def test_upper_above_lower(self, ohlcv_daily):
+        out = DonchianChannels(window=20)(ohlcv_daily)
+        valid = out["donchian_upper_20"].dropna().index
+        assert (out.loc[valid, "donchian_upper_20"] >= out.loc[valid, "donchian_lower_20"]).all()
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, DonchianChannels()(ohlcv_daily))
+
+
+class TestSupertrend:
+    def test_output_columns(self, ohlcv_daily):
+        out = Supertrend()(ohlcv_daily)
+        assert "supertrend" in out.columns
+        assert "supertrend_dir" in out.columns
+
+    def test_direction_values(self, ohlcv_daily):
+        out = Supertrend()(ohlcv_daily)
+        valid = out["supertrend_dir"].dropna()
+        assert set(valid.unique()).issubset({-1.0, 1.0})
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, Supertrend()(ohlcv_daily))
+
+
 # ===========================================================================
 # New momentum features (PR 3)
 # ===========================================================================
@@ -719,6 +773,67 @@ class TestUltimateOscillator:
     def test_bounded_0_100(self, ohlcv_daily):
         out = UltimateOscillator()(ohlcv_daily)
         assert_column_in_range(out["ultimate_osc"], 0, 100)
+
+
+class TestStochasticRSI:
+    def test_output_columns(self, ohlcv_daily):
+        out = StochasticRSI(window=14)(ohlcv_daily)
+        assert "stochrsi_k_14" in out.columns
+        assert "stochrsi_d_14" in out.columns
+
+    def test_bounded_0_100(self, ohlcv_daily):
+        out = StochasticRSI(window=14)(ohlcv_daily)
+        # Allow tiny floating-point overshoot
+        assert_column_in_range(out["stochrsi_k_14"], -0.01, 100.01)
+        assert_column_in_range(out["stochrsi_d_14"], -0.01, 100.01)
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, StochasticRSI()(ohlcv_daily))
+
+
+class TestTRIX:
+    def test_output_column(self, ohlcv_daily):
+        out = TRIX(window=30)(ohlcv_daily)
+        assert "trix_30" in out.columns
+
+    def test_oscillates_around_zero(self, ohlcv_daily):
+        out = TRIX(window=15)(ohlcv_daily)
+        valid = out["trix_15"].dropna()
+        assert valid.min() < 0
+        assert valid.max() > 0
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, TRIX()(ohlcv_daily))
+
+
+class TestPPO:
+    def test_output_column(self, ohlcv_daily):
+        out = PPO(fast=12, slow=26)(ohlcv_daily)
+        assert "ppo_12_26" in out.columns
+
+    def test_fast_ge_slow_raises(self):
+        with pytest.raises(ValueError, match="fast.*<.*slow"):
+            PPO(fast=26, slow=12)
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, PPO()(ohlcv_daily))
+
+
+class TestKeltnerChannels:
+    def test_output_columns(self, ohlcv_daily):
+        out = KeltnerChannels(window=20)(ohlcv_daily)
+        assert "keltner_upper_20" in out.columns
+        assert "keltner_mid_20" in out.columns
+        assert "keltner_lower_20" in out.columns
+        assert "keltner_pct_20" in out.columns
+
+    def test_upper_above_lower(self, ohlcv_daily):
+        out = KeltnerChannels(window=20)(ohlcv_daily)
+        valid = out["keltner_upper_20"].dropna().index
+        assert (out.loc[valid, "keltner_upper_20"] > out.loc[valid, "keltner_lower_20"]).all()
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, KeltnerChannels()(ohlcv_daily))
 
 
 # ===========================================================================

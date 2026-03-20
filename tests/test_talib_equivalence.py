@@ -290,3 +290,27 @@ class TestLinRegSlopeEquivalence:
             skip_rows=14,
             atol=1e-6,
         )
+
+
+class TestStochRSIEquivalence:
+    def test_stochrsi(self, ohlcv_daily):
+        from finfeatures.features.momentum import StochasticRSI
+
+        a, b = _run_both_paths(StochasticRSI, ohlcv_daily, window=14)
+        _compare_cols(a, b, ["stochrsi_k_14", "stochrsi_d_14"], skip_rows=60, atol=1e-2)
+
+
+class TestTRIXEquivalence:
+    def test_trix(self, ohlcv_daily):
+        from finfeatures.features.momentum import TRIX
+
+        a, b = _run_both_paths(TRIX, ohlcv_daily, window=15)
+        _compare_cols(a, b, ["trix_15"], skip_rows=90, atol=1e-4)
+
+
+class TestPPOEquivalence:
+    def test_ppo(self, ohlcv_daily):
+        from finfeatures.features.momentum import PPO
+
+        a, b = _run_both_paths(PPO, ohlcv_daily, fast=12, slow=26)
+        _compare_cols(a, b, ["ppo_12_26"], skip_rows=78, atol=1e-4)
