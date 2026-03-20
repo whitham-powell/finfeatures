@@ -40,6 +40,7 @@ from .price import (
     TypicalPrice,
 )
 from .statistical import (
+    CrossAssetCorrelation,
     LinearRegressionSlope,
     RollingAutocorrelation,
     RollingCorrelation,
@@ -130,6 +131,7 @@ __all__ = [
     "RollingMoments",
     "RollingAutocorrelation",
     "RollingCorrelation",
+    "CrossAssetCorrelation",
     "LinearRegressionSlope",
     # patterns
     "CandlePatterns",

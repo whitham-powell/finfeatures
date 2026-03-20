@@ -37,6 +37,7 @@ from finfeatures.features.price import (
     TypicalPrice,
 )
 from finfeatures.features.statistical import (
+    CrossAssetCorrelation,
     LinearRegressionSlope,
     RollingSkewKurt,
     RollingZScore,
@@ -797,3 +798,82 @@ class TestCandlePatterns:
 
     def test_raw_preserved(self, ohlcv_daily):
         assert_raw_cols_preserved(ohlcv_daily, CandlePatterns()(ohlcv_daily))
+
+
+# ===========================================================================
+# Cross-asset correlation
+# ===========================================================================
+
+
+class TestCrossAssetCorrelation:
+    @pytest.fixture()
+    def reference_df(self):
+        """Synthetic reference asset with same date range as ohlcv_daily."""
+        rng = np.random.default_rng(99)
+        n = 500
+        dates = pd.date_range("2020-01-02", periods=n, freq="B")
+        close = 50.0 * np.exp(np.cumsum(rng.normal(0, 0.01, n)))
+        return pd.DataFrame(
+            {
+                "open": close * (1 + rng.uniform(-0.005, 0.005, n)),
+                "high": close * (1 + rng.uniform(0.002, 0.01, n)),
+                "low": close * (1 - rng.uniform(0.002, 0.01, n)),
+                "close": close,
+                "volume": rng.lognormal(14, 0.5, n).astype(int),
+            },
+            index=dates,
+        )
+
+    @pytest.mark.parametrize("column", ["open", "high", "low", "close"])
+    def test_ohlc_columns(self, ohlcv_daily, reference_df, column):
+        feat = CrossAssetCorrelation(
+            reference=reference_df, reference_name="spy", column=column, windows=7
+        )
+        out = feat(ohlcv_daily)
+        col_name = f"corr_spy_{column}_7"
+        assert col_name in out.columns
+        assert_column_in_range(out[col_name], -1, 1)
+
+    def test_multiple_windows(self, ohlcv_daily, reference_df):
+        feat = CrossAssetCorrelation(
+            reference=reference_df, reference_name="spy", column="close", windows=[7, 21]
+        )
+        out = feat(ohlcv_daily)
+        assert "corr_spy_close_7" in out.columns
+        assert "corr_spy_close_21" in out.columns
+
+    def test_different_columns_naming(self, ohlcv_daily, reference_df):
+        feat = CrossAssetCorrelation(
+            reference=reference_df,
+            reference_name="spy",
+            column="high",
+            reference_column="low",
+            windows=7,
+        )
+        out = feat(ohlcv_daily)
+        assert "corr_spy_high_vs_low_7" in out.columns
+
+    def test_perfect_self_correlation(self, ohlcv_daily):
+        """Correlating a DataFrame with itself should give ~1.0."""
+        feat = CrossAssetCorrelation(
+            reference=ohlcv_daily, reference_name="self", column="close", windows=21
+        )
+        out = feat(ohlcv_daily)
+        valid = out["corr_self_close_21"].dropna()
+        assert (valid > 0.999).all()
+
+    def test_missing_reference_column_raises(self, reference_df):
+        with pytest.raises(ValueError, match="reference_column"):
+            CrossAssetCorrelation(
+                reference=reference_df,
+                reference_name="spy",
+                column="close",
+                reference_column="nonexistent",
+                windows=7,
+            )
+
+    def test_raw_preserved(self, ohlcv_daily, reference_df):
+        feat = CrossAssetCorrelation(
+            reference=reference_df, reference_name="spy", column="close", windows=7
+        )
+        assert_raw_cols_preserved(ohlcv_daily, feat(ohlcv_daily))
