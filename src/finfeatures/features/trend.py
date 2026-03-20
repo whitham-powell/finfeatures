@@ -10,7 +10,14 @@ import numpy as np
 import pandas as pd
 
 from finfeatures.core._compat import HAS_TALIB, _f64, talib
-from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
+from finfeatures.core.base import (
+    Columns,
+    Feature,
+    _sma_seeded_ema,
+    _validate_window,
+    _wilder_smooth,
+    safe_divide,
+)
 
 
 class SimpleMovingAverage(Feature):
@@ -77,7 +84,7 @@ class ExponentialMovingAverage(Feature):
             if HAS_TALIB:
                 out[f"ema_{w}"] = talib.EMA(_f64(close), timeperiod=w)
             else:
-                out[f"ema_{w}"] = close.ewm(span=w, adjust=False).mean()
+                out[f"ema_{w}"] = _sma_seeded_ema(close, w)
         return out
 
 
@@ -140,10 +147,10 @@ class MACD(Feature):
             out["macd_signal"] = signal_line
             out["macd_hist"] = pd.Series(hist_vals, index=close.index)
         else:
-            ema_fast = close.ewm(span=self.fast, adjust=False).mean()
-            ema_slow = close.ewm(span=self.slow, adjust=False).mean()
+            ema_fast = _sma_seeded_ema(close, self.fast)
+            ema_slow = _sma_seeded_ema(close, self.slow)
             macd_line = ema_fast - ema_slow
-            signal_line = macd_line.ewm(span=self.signal, adjust=False).mean()
+            signal_line = _sma_seeded_ema(macd_line.dropna(), self.signal).reindex(close.index)
             out["macd_line"] = macd_line
             out["macd_signal"] = signal_line
             out["macd_hist"] = macd_line - signal_line
@@ -202,14 +209,18 @@ class TrendStrength(Feature):
             plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
             minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
 
-            atr_s = pd.Series(tr).ewm(span=w, adjust=False).mean()
-            plus_dm_s = pd.Series(plus_dm).ewm(span=w, adjust=False).mean()
-            minus_dm_s = pd.Series(minus_dm).ewm(span=w, adjust=False).mean()
+            tr_s = pd.Series(tr, index=df.index)
+            plus_dm_s = pd.Series(plus_dm, index=df.index)
+            minus_dm_s = pd.Series(minus_dm, index=df.index)
 
-            di_plus = safe_divide(100 * plus_dm_s, atr_s)
-            di_minus = safe_divide(100 * minus_dm_s, atr_s)
+            atr_smooth = _wilder_smooth(tr_s, w)
+            plus_dm_smooth = _wilder_smooth(plus_dm_s, w)
+            minus_dm_smooth = _wilder_smooth(minus_dm_s, w)
+
+            di_plus = safe_divide(100 * plus_dm_smooth, atr_smooth)
+            di_minus = safe_divide(100 * minus_dm_smooth, atr_smooth)
             dx = safe_divide(100 * (di_plus - di_minus).abs(), di_plus + di_minus)
-            adx = dx.ewm(span=w, adjust=False).mean()
+            adx = _wilder_smooth(dx.dropna(), w).reindex(df.index)
 
             out[f"adx_{w}"] = adx.values
             out["di_plus"] = di_plus.values
@@ -409,8 +420,8 @@ class DEMA(Feature):
             if HAS_TALIB:
                 out[f"dema_{w}"] = talib.DEMA(_f64(close), timeperiod=w)
             else:
-                ema1 = close.ewm(span=w, adjust=False).mean()
-                ema2 = ema1.ewm(span=w, adjust=False).mean()
+                ema1 = _sma_seeded_ema(close, w)
+                ema2 = _sma_seeded_ema(ema1.dropna(), w).reindex(close.index)
                 out[f"dema_{w}"] = 2 * ema1 - ema2
         return out
 
@@ -445,9 +456,9 @@ class TEMA(Feature):
             if HAS_TALIB:
                 out[f"tema_{w}"] = talib.TEMA(_f64(close), timeperiod=w)
             else:
-                ema1 = close.ewm(span=w, adjust=False).mean()
-                ema2 = ema1.ewm(span=w, adjust=False).mean()
-                ema3 = ema2.ewm(span=w, adjust=False).mean()
+                ema1 = _sma_seeded_ema(close, w)
+                ema2 = _sma_seeded_ema(ema1.dropna(), w).reindex(close.index)
+                ema3 = _sma_seeded_ema(ema2.dropna(), w).reindex(close.index)
                 out[f"tema_{w}"] = 3 * ema1 - 3 * ema2 + ema3
         return out
 

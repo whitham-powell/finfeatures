@@ -10,7 +10,14 @@ import numpy as np
 import pandas as pd
 
 from finfeatures.core._compat import HAS_TALIB, _f64, talib
-from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
+from finfeatures.core.base import (
+    Columns,
+    Feature,
+    _sma_seeded_ema,
+    _validate_window,
+    _wilder_smooth,
+    safe_divide,
+)
 
 
 class RSI(Feature):
@@ -44,8 +51,8 @@ class RSI(Feature):
             delta = close.diff()
             gain = delta.clip(lower=0)
             loss = (-delta).clip(lower=0)
-            avg_gain = gain.ewm(alpha=1 / self.window, adjust=False).mean()
-            avg_loss = loss.ewm(alpha=1 / self.window, adjust=False).mean()
+            avg_gain = _wilder_smooth(gain.iloc[1:], self.window).reindex(close.index)
+            avg_loss = _wilder_smooth(loss.iloc[1:], self.window).reindex(close.index)
             rs = safe_divide(avg_gain, avg_loss)
             out[f"rsi_{self.window}"] = 100 - (100 / (1 + rs))
         return out
@@ -455,12 +462,12 @@ class StochasticRSI(Feature):
             out[f"stochrsi_k_{w}"] = fastk
             out[f"stochrsi_d_{w}"] = fastd
         else:
-            # Compute RSI first
+            # Compute RSI first (Wilder smoothing to match TA-Lib)
             delta = close.diff()
             gain = delta.clip(lower=0)
             loss = (-delta).clip(lower=0)
-            avg_gain = gain.ewm(alpha=1 / w, adjust=False).mean()
-            avg_loss = loss.ewm(alpha=1 / w, adjust=False).mean()
+            avg_gain = _wilder_smooth(gain.iloc[1:], w).reindex(close.index)
+            avg_loss = _wilder_smooth(loss.iloc[1:], w).reindex(close.index)
             rs = safe_divide(avg_gain, avg_loss)
             rsi = 100 - (100 / (1 + rs))
             # Apply stochastic formula to RSI
@@ -500,9 +507,9 @@ class TRIX(Feature):
         if HAS_TALIB:
             out[f"trix_{self.window}"] = talib.TRIX(_f64(close), timeperiod=self.window)
         else:
-            ema1 = close.ewm(span=self.window, adjust=False).mean()
-            ema2 = ema1.ewm(span=self.window, adjust=False).mean()
-            ema3 = ema2.ewm(span=self.window, adjust=False).mean()
+            ema1 = _sma_seeded_ema(close, self.window)
+            ema2 = _sma_seeded_ema(ema1.dropna(), self.window).reindex(close.index)
+            ema3 = _sma_seeded_ema(ema2.dropna(), self.window).reindex(close.index)
             out[f"trix_{self.window}"] = ema3.pct_change() * 100
         return out
 
@@ -544,7 +551,7 @@ class PPO(Feature):
                 matype=0,  # type: ignore[arg-type]  # MA_Type.SMA
             )
         else:
-            ema_fast = close.ewm(span=self.fast, adjust=False).mean()
-            ema_slow = close.ewm(span=self.slow, adjust=False).mean()
+            ema_fast = _sma_seeded_ema(close, self.fast)
+            ema_slow = _sma_seeded_ema(close, self.slow)
             out[f"ppo_{self.fast}_{self.slow}"] = safe_divide(100 * (ema_fast - ema_slow), ema_slow)
         return out

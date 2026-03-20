@@ -25,6 +25,19 @@ def skip_without_talib() -> None:
 def force_no_talib(monkeypatch: pytest.MonkeyPatch):
     """Monkeypatch HAS_TALIB=False so the pandas fallback is tested."""
     monkeypatch.setattr(_compat_mod, "HAS_TALIB", False)
+    # Also patch the local binding in every module that imports HAS_TALIB
+    from finfeatures.features import (
+        momentum,
+        patterns,
+        price,
+        statistical,
+        trend,
+        volatility,
+        volume,
+    )
+
+    for mod in [momentum, patterns, price, statistical, trend, volatility, volume]:
+        monkeypatch.setattr(mod, "HAS_TALIB", False)
 
 
 @pytest.fixture

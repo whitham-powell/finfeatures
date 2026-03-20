@@ -11,7 +11,14 @@ import numpy as np
 import pandas as pd
 
 from finfeatures.core._compat import HAS_TALIB, _f64, talib
-from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
+from finfeatures.core.base import (
+    Columns,
+    Feature,
+    _sma_seeded_ema,
+    _validate_window,
+    _wilder_smooth,
+    safe_divide,
+)
 
 
 class RollingVolatility(Feature):
@@ -150,7 +157,7 @@ class BollingerBands(Feature):
             lower = pd.Series(lower_arr, index=close.index)
         else:
             sma = close.rolling(w).mean()
-            std = close.rolling(w).std()
+            std = close.rolling(w).std(ddof=0)
             upper = sma + self.num_std * std
             lower = sma - self.num_std * std
         out[f"bb_middle_{w}"] = sma
@@ -202,7 +209,7 @@ class AverageTrueRange(Feature):
                 ],
                 axis=1,
             ).max(axis=1)
-            out[col] = tr.ewm(span=self.window, adjust=False).mean()
+            out[col] = _wilder_smooth(tr.iloc[1:], self.window).reindex(df.index)
         # Normalised ATR (as % of close)
         out[f"atr_pct_{self.window}"] = safe_divide(out[col], df[Columns.CLOSE])
         return out
@@ -331,7 +338,7 @@ class KeltnerChannels(Feature):
                 index=close.index,
             )
         else:
-            mid = close.ewm(span=w, adjust=False).mean()
+            mid = _sma_seeded_ema(close, w)
             prev_close = close.shift(1)
             tr = pd.concat(
                 [
@@ -341,7 +348,7 @@ class KeltnerChannels(Feature):
                 ],
                 axis=1,
             ).max(axis=1)
-            atr = tr.ewm(span=w, adjust=False).mean()
+            atr = _wilder_smooth(tr.iloc[1:], w).reindex(df.index)
 
         upper = mid + self.multiplier * atr
         lower = mid - self.multiplier * atr

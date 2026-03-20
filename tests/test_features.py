@@ -911,6 +911,10 @@ class TestCandlePatterns:
             for v in vals:
                 assert v == int(v), f"Non-integer value {v} in {col}"
 
+    def test_warns_without_talib(self, ohlcv_daily, force_no_talib):
+        with pytest.warns(UserWarning, match="6 of 61"):
+            CandlePatterns()(ohlcv_daily)
+
     def test_raw_preserved(self, ohlcv_daily):
         assert_raw_cols_preserved(ohlcv_daily, CandlePatterns()(ohlcv_daily))
 

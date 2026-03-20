@@ -7,6 +7,8 @@ Otherwise, a small set of common patterns is computed in pure pandas.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -65,6 +67,11 @@ class CandlePatterns(Feature):
                 func = getattr(talib, fn_name)
                 out[fn_name.lower()] = func(o, h, lo, c)
         else:
+            warnings.warn(
+                "CandlePatterns: TA-Lib not installed, producing 6 of 61 patterns. "
+                "Install with: pip install finfeatures[talib]",
+                stacklevel=2,
+            )
             self._pandas_patterns(out, o, h, lo, c)
         return out
 

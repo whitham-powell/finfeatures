@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from finfeatures.core._compat import HAS_TALIB, _f64, talib
-from finfeatures.core.base import Columns, Feature, _validate_window, safe_divide
+from finfeatures.core.base import Columns, Feature, _sma_seeded_ema, _validate_window, safe_divide
 
 
 class VolumeFeatures(Feature):
@@ -197,8 +197,7 @@ class ChaikinADOscillator(Feature):
         else:
             clv = safe_divide((c - lo) - (h - c), h - lo)
             ad = (clv * v).cumsum()
-            out[f"adosc_{self.fast}_{self.slow}"] = (
-                ad.ewm(span=self.fast, adjust=False).mean()
-                - ad.ewm(span=self.slow, adjust=False).mean()
-            )
+            out[f"adosc_{self.fast}_{self.slow}"] = _sma_seeded_ema(
+                ad, self.fast
+            ) - _sma_seeded_ema(ad, self.slow)
         return out
