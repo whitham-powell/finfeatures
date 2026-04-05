@@ -44,6 +44,7 @@ from .price import (
 )
 from .statistical import (
     CrossAssetCorrelation,
+    HurstExponent,
     LinearRegressionSlope,
     RollingAutocorrelation,
     RollingCorrelation,
@@ -64,6 +65,8 @@ from .trend import (
     SimpleMovingAverage,
     Supertrend,
     TrendStrength,
+    VolumeWeightedMovingAverage,
+    WeightedMovingAverage,
 )
 from .volatility import (
     AverageTrueRange,
@@ -73,6 +76,7 @@ from .volatility import (
     MovingTrueRange,
     ParkinsonVolatility,
     RollingVolatility,
+    TrueRange,
     VolatilityRatio,
 )
 from .volume import (
@@ -104,6 +108,7 @@ __all__ = [
     "AverageTrueRange",
     "MovingTrueRange",
     "VolatilityRatio",
+    "TrueRange",
     "KeltnerChannels",
     # trend
     "SimpleMovingAverage",
@@ -115,6 +120,8 @@ __all__ = [
     "ParabolicSAR",
     "DEMA",
     "TEMA",
+    "WeightedMovingAverage",
+    "VolumeWeightedMovingAverage",
     "IchimokuCloud",
     "DonchianChannels",
     "Supertrend",
@@ -146,6 +153,7 @@ __all__ = [
     "RollingAutocorrelation",
     "RollingCorrelation",
     "CrossAssetCorrelation",
+    "HurstExponent",
     "LinearRegressionSlope",
     # patterns
     "CandlePatterns",

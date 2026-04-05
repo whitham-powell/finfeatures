@@ -238,6 +238,97 @@ class CrossAssetCorrelation(Feature):
         return out
 
 
+class HurstExponent(Feature):
+    """
+    Rolling Hurst exponent via Rescaled Range (R/S) analysis.
+
+    Measures long-term memory of a time series:
+      - H > 0.5: trending / persistent
+      - H ≈ 0.5: random walk
+      - H < 0.5: mean-reverting
+
+    Output column: ``{column}_hurst_{window}``
+    """
+
+    name = "hurst_exponent"
+    description = "Rolling Hurst exponent via R/S analysis"
+
+    def __init__(self, column: str = Columns.LOG_RETURN, window: int = 100) -> None:
+        _validate_window(window, minimum=20)
+        self.column = column
+        self.window = window
+        self.required_cols = [self.column]
+
+    @property
+    def min_periods(self) -> int:
+        return self.window
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"{self.column}_hurst_{self.window}"]
+
+    @staticmethod
+    def _rs_hurst(x: np.ndarray) -> float:
+        """Estimate Hurst exponent from a 1-D array using R/S analysis."""
+        n = len(x)
+        # Use sub-series lengths that are divisors or near-divisors of n
+        # At least 3 distinct sizes are needed for a meaningful regression
+        max_k = n // 2
+        sizes = []
+        k = 10
+        while k <= max_k:
+            sizes.append(k)
+            k = int(k * 1.5) or k + 1
+        if len(sizes) < 3:
+            return np.nan
+
+        log_sizes = []
+        log_rs = []
+        for size in sizes:
+            n_chunks = n // size
+            if n_chunks < 1:
+                continue
+            rs_values = np.empty(n_chunks)
+            for i in range(n_chunks):
+                chunk = x[i * size : (i + 1) * size]
+                mean = chunk.mean()
+                deviate = np.cumsum(chunk - mean)
+                r = deviate.max() - deviate.min()
+                s = chunk.std(ddof=1)
+                if s < 1e-12:
+                    rs_values[i] = np.nan
+                else:
+                    rs_values[i] = r / s
+            rs_mean = np.nanmean(rs_values)
+            if np.isnan(rs_mean) or rs_mean <= 0:
+                continue
+            log_sizes.append(np.log(size))
+            log_rs.append(np.log(rs_mean))
+
+        if len(log_sizes) < 3:
+            return np.nan
+
+        # OLS slope of log(R/S) vs log(size)
+        log_sizes_arr = np.array(log_sizes)
+        log_rs_arr = np.array(log_rs)
+        x_mean = log_sizes_arr.mean()
+        y_mean = log_rs_arr.mean()
+        slope = np.dot(log_sizes_arr - x_mean, log_rs_arr - y_mean) / np.dot(
+            log_sizes_arr - x_mean, log_sizes_arr - x_mean
+        )
+        return float(slope)
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        col_name = f"{self.column}_hurst_{self.window}"
+        out[col_name] = (
+            df[self.column]
+            .rolling(self.window)
+            .apply(lambda x: self._rs_hurst(np.asarray(x)), raw=True)
+        )
+        return out
+
+
 class LinearRegressionSlope(Feature):
     """
     Rolling linear regression slope.

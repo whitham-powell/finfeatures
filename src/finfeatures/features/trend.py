@@ -463,6 +463,74 @@ class TEMA(Feature):
         return out
 
 
+class WeightedMovingAverage(Feature):
+    """
+    Weighted Moving Average — linearly weighted, most recent weight = window.
+    """
+
+    name = "wma"
+    required_cols = [Columns.CLOSE]
+    description = "Weighted Moving Average"
+
+    def __init__(self, windows: list[int] | None = None) -> None:
+        self.windows = windows or [10, 20]
+        for w in self.windows:
+            _validate_window(w, "windows element")
+
+    @property
+    def min_periods(self) -> int:
+        return max(self.windows)
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"wma_{w}" for w in self.windows]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        close = df[Columns.CLOSE]
+        for w in self.windows:
+            if HAS_TALIB:
+                out[f"wma_{w}"] = talib.WMA(_f64(close), timeperiod=w)
+            else:
+                weights = np.arange(1, w + 1, dtype=float)
+                out[f"wma_{w}"] = close.rolling(w).apply(
+                    lambda x, wt=weights: np.dot(x, wt) / wt.sum(), raw=True
+                )
+        return out
+
+
+class VolumeWeightedMovingAverage(Feature):
+    """
+    Volume-Weighted Moving Average: sum(close * volume, window) / sum(volume, window).
+    """
+
+    name = "vwma"
+    required_cols = [Columns.CLOSE, Columns.VOLUME]
+    description = "Volume-Weighted Moving Average"
+
+    def __init__(self, windows: list[int] | None = None) -> None:
+        self.windows = windows or [10, 20]
+        for w in self.windows:
+            _validate_window(w, "windows element")
+
+    @property
+    def min_periods(self) -> int:
+        return max(self.windows)
+
+    @property
+    def output_cols(self) -> list[str]:
+        return [f"vwma_{w}" for w in self.windows]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        close = df[Columns.CLOSE]
+        volume = df[Columns.VOLUME]
+        cv = close * volume
+        for w in self.windows:
+            out[f"vwma_{w}"] = safe_divide(cv.rolling(w).sum(), volume.rolling(w).sum())
+        return out
+
+
 class IchimokuCloud(Feature):
     """
     Ichimoku Kinko Hyo — trend direction, support/resistance, and momentum.

@@ -170,6 +170,48 @@ class BollingerBands(Feature):
         return out
 
 
+class TrueRange(Feature):
+    """
+    True Range: max(H-L, |H-Cprev|, |L-Cprev|).
+
+    Raw per-bar volatility measure before any smoothing.
+    Useful for breakout detection and as an input to custom indicators.
+    """
+
+    name = "true_range"
+    required_cols = [Columns.HIGH, Columns.LOW, Columns.CLOSE]
+    description = "True Range (unsmoothed)"
+
+    @property
+    def min_periods(self) -> int:
+        return 2
+
+    @property
+    def output_cols(self) -> list[str]:
+        return ["true_range"]
+
+    def compute(self, df: pd.DataFrame) -> pd.DataFrame:
+        out = df.copy()
+        if HAS_TALIB:
+            out["true_range"] = talib.TRANGE(
+                _f64(df[Columns.HIGH]),
+                _f64(df[Columns.LOW]),
+                _f64(df[Columns.CLOSE]),
+            )
+        else:
+            prev_close = df[Columns.CLOSE].shift(1)
+            out["true_range"] = pd.concat(
+                [
+                    df[Columns.HIGH] - df[Columns.LOW],
+                    (df[Columns.HIGH] - prev_close).abs(),
+                    (df[Columns.LOW] - prev_close).abs(),
+                ],
+                axis=1,
+            ).max(axis=1)
+            out.loc[out.index[0], "true_range"] = np.nan
+        return out
+
+
 class AverageTrueRange(Feature):
     """
     Wilder's Average True Range (ATR).

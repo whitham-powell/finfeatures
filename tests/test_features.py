@@ -41,6 +41,7 @@ from finfeatures.features.price import (
 )
 from finfeatures.features.statistical import (
     CrossAssetCorrelation,
+    HurstExponent,
     LinearRegressionSlope,
     RollingSkewKurt,
     RollingZScore,
@@ -56,6 +57,8 @@ from finfeatures.features.trend import (
     ParabolicSAR,
     SimpleMovingAverage,
     Supertrend,
+    VolumeWeightedMovingAverage,
+    WeightedMovingAverage,
 )
 from finfeatures.features.volatility import (
     AverageTrueRange,
@@ -63,6 +66,7 @@ from finfeatures.features.volatility import (
     KeltnerChannels,
     MovingTrueRange,
     RollingVolatility,
+    TrueRange,
 )
 from finfeatures.features.volume import (
     AccumulationDistribution,
@@ -217,6 +221,29 @@ class TestBollingerBands:
         assert within > 0.87
 
 
+class TestTrueRange:
+    def test_output_column(self, ohlcv_daily):
+        out = TrueRange()(ohlcv_daily)
+        assert "true_range" in out.columns
+
+    def test_positive_values(self, ohlcv_daily):
+        out = TrueRange()(ohlcv_daily)
+        values = out["true_range"].dropna()
+        assert len(values) > 0
+        assert (values >= 0).all()
+
+    def test_first_row_nan(self, ohlcv_daily):
+        out = TrueRange()(ohlcv_daily)
+        assert pd.isna(out["true_range"].iloc[0])
+
+    def test_gte_high_minus_low(self, ohlcv_daily):
+        """True range >= H-L for every bar (by definition)."""
+        out = TrueRange()(ohlcv_daily)
+        valid = out["true_range"].dropna().index
+        hl = out.loc[valid, "high"] - out.loc[valid, "low"]
+        assert (out.loc[valid, "true_range"] >= hl - 1e-10).all()
+
+
 class TestAverageTrueRange:
     def test_output_column(self, ohlcv_daily):
         out = AverageTrueRange(window=14)(ohlcv_daily)
@@ -361,6 +388,49 @@ class TestRollingZScore:
         out = RollingZScore(column="log_return", window=21)(df)
         mean = out["log_return_zscore_21"].dropna().mean()
         assert abs(mean) < 0.5  # z-scores should be centred
+
+
+class TestHurstExponent:
+    def test_output_column(self, ohlcv_daily):
+        from finfeatures.features.price import LogReturns
+
+        df = LogReturns()(ohlcv_daily)
+        out = HurstExponent(column="log_return", window=100)(df)
+        assert "log_return_hurst_100" in out.columns
+
+    def test_values_in_range(self, ohlcv_daily):
+        from finfeatures.features.price import LogReturns
+
+        df = LogReturns()(ohlcv_daily)
+        out = HurstExponent(column="log_return", window=100)(df)
+        values = out["log_return_hurst_100"].dropna()
+        assert len(values) > 0
+        assert (values >= 0).all() and (values <= 1).all()
+
+    def test_random_walk_near_half(self):
+        """Pure random walk should produce H ≈ 0.5."""
+        rng = np.random.default_rng(123)
+        n = 1000
+        dates = pd.date_range("2020-01-01", periods=n, freq="B")
+        returns = rng.normal(0, 0.01, n)
+        df = pd.DataFrame({"log_return": returns}, index=dates)
+        out = HurstExponent(column="log_return", window=500)(df)
+        values = out["log_return_hurst_500"].dropna()
+        assert len(values) > 0
+        # Should be roughly 0.5 for a random walk (allow tolerance)
+        assert abs(values.iloc[-1] - 0.5) < 0.15
+
+    def test_window_too_small_raises(self):
+        with pytest.raises(ValueError):
+            HurstExponent(window=10)
+
+    def test_preserves_raw_columns(self, ohlcv_daily):
+        from finfeatures.features.price import LogReturns
+
+        df = LogReturns()(ohlcv_daily)
+        out = HurstExponent(column="log_return", window=100)(df)
+        for col in ohlcv_daily.columns:
+            assert col in out.columns
 
 
 class TestRollingSkewKurt:
@@ -718,6 +788,59 @@ class TestSupertrend:
 
     def test_raw_preserved(self, ohlcv_daily):
         assert_raw_cols_preserved(ohlcv_daily, Supertrend()(ohlcv_daily))
+
+
+class TestWeightedMovingAverage:
+    def test_output_columns(self, ohlcv_daily):
+        out = WeightedMovingAverage(windows=[10, 20])(ohlcv_daily)
+        assert "wma_10" in out.columns
+        assert "wma_20" in out.columns
+
+    def test_values_reasonable(self, ohlcv_daily):
+        out = WeightedMovingAverage(windows=[10])(ohlcv_daily)
+        valid = out["wma_10"].dropna()
+        assert len(valid) > 0
+        # WMA should be in the range of prices
+        assert valid.min() > 0
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, WeightedMovingAverage()(ohlcv_daily))
+
+
+class TestVolumeWeightedMovingAverage:
+    def test_output_columns(self, ohlcv_daily):
+        out = VolumeWeightedMovingAverage(windows=[10, 20])(ohlcv_daily)
+        assert "vwma_10" in out.columns
+        assert "vwma_20" in out.columns
+
+    def test_values_reasonable(self, ohlcv_daily):
+        out = VolumeWeightedMovingAverage(windows=[10])(ohlcv_daily)
+        valid = out["vwma_10"].dropna()
+        assert len(valid) > 0
+        assert valid.min() > 0
+
+    def test_close_to_sma_with_uniform_volume(self):
+        """With constant volume, VWMA should equal SMA."""
+        rng = np.random.default_rng(99)
+        n = 50
+        dates = pd.date_range("2023-01-02", periods=n, freq="B")
+        close = 100.0 + np.cumsum(rng.normal(0, 1, n))
+        df = pd.DataFrame(
+            {
+                "open": close,
+                "high": close + 1,
+                "low": close - 1,
+                "close": close,
+                "volume": np.full(n, 1_000_000),
+            },
+            index=dates,
+        )
+        out = VolumeWeightedMovingAverage(windows=[10])(df)
+        sma = close[-10:].mean()
+        assert abs(out["vwma_10"].iloc[-1] - sma) < 1e-10
+
+    def test_raw_preserved(self, ohlcv_daily):
+        assert_raw_cols_preserved(ohlcv_daily, VolumeWeightedMovingAverage()(ohlcv_daily))
 
 
 # ===========================================================================

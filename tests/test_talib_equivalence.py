@@ -133,6 +133,27 @@ class TestTEMAEquivalence:
         _compare_cols(a, b, ["tema_10", "tema_20"])
 
 
+class TestWMAEquivalence:
+    def test_wma(self, ohlcv_daily):
+        from finfeatures.features.trend import WeightedMovingAverage
+
+        a, b = _run_both_paths(WeightedMovingAverage, ohlcv_daily, windows=[10, 20])
+        _compare_cols(a, b, ["wma_10", "wma_20"])
+
+
+# ===========================================================================
+# Volatility features — True Range
+# ===========================================================================
+
+
+class TestTrueRangeEquivalence:
+    def test_trange(self, ohlcv_daily):
+        from finfeatures.features.volatility import TrueRange
+
+        a, b = _run_both_paths(TrueRange, ohlcv_daily)
+        _compare_cols(a, b, ["true_range"])
+
+
 # ===========================================================================
 # Momentum features
 # ===========================================================================
