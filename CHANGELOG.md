@@ -4,6 +4,23 @@ All notable changes to this project will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-04-04
+
+### Added
+- **HurstExponent** — rolling Hurst exponent via Rescaled Range (R/S) analysis for
+  regime detection (H > 0.5 trending, H ≈ 0.5 random walk, H < 0.5 mean-reverting).
+- **WeightedMovingAverage (WMA)** — linearly weighted MA with TA-Lib integration.
+- **VolumeWeightedMovingAverage (VWMA)** — `sum(close × volume) / sum(volume)` over
+  a rolling window.
+- **TrueRange** — raw per-bar true range (unsmoothed) with TA-Lib integration.
+  Useful for breakout detection and as input to custom indicators.
+- GitHub issue templates for feature requests and bug reports.
+
+### Fixed
+- **Non-positive price validation** — `FeaturePipeline.transform()` now rejects
+  DataFrames containing zero or negative OHLC prices at the pipeline boundary,
+  preventing silent NaN propagation through `log()` and `safe_divide()` downstream.
+
 ## [0.2.0] — 2026-03-19
 
 ### Added
