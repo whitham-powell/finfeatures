@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from .base import Feature, FeatureRegistry
+from .base import Columns, Feature, FeatureRegistry
 
 
 class FeaturePipeline:
@@ -92,6 +92,22 @@ class FeaturePipeline:
                 )
             available.update(feature.output_cols)
 
+    @staticmethod
+    def _validate_prices(df: pd.DataFrame) -> None:
+        price_cols = [c for c in Columns.PRICE if c in df.columns]
+        if not price_cols:
+            return
+        prices = df[price_cols]
+        non_positive = (prices <= 0).any()
+        bad_cols = non_positive[non_positive].index.tolist()
+        if bad_cols:
+            details = {col: int((df[col] <= 0).sum()) for col in bad_cols}
+            raise ValueError(
+                f"Non-positive values in price columns will silently corrupt "
+                f"downstream features (log, divide-by-zero → NaN propagation). "
+                f"Affected columns (count of rows <= 0): {details}"
+            )
+
     # ------------------------------------------------------------------
     # Core transform
     # ------------------------------------------------------------------
@@ -117,6 +133,7 @@ class FeaturePipeline:
                 f"FeaturePipeline requires a DatetimeIndex, got {type(df.index).__name__}. "
                 f"Convert with: df.index = pd.to_datetime(df.index)"
             )
+        self._validate_prices(df)
         self._validate_dependencies(list(df.columns))
         result = df.copy()
         raw_cols = list(df.columns)

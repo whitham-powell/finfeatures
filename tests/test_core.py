@@ -221,6 +221,47 @@ def test_pipeline_accepts_datetime_index(ohlcv_daily):
 
 
 # ---------------------------------------------------------------------------
+# Non-positive price validation
+# ---------------------------------------------------------------------------
+
+
+def test_pipeline_rejects_zero_price():
+    """Pipeline must reject a DataFrame with zero in a price column."""
+    dates = pd.date_range("2023-01-02", periods=3, freq="B")
+    df = pd.DataFrame(
+        {
+            "open": [1.0, 0.0, 3.0],
+            "high": [2.0, 1.0, 4.0],
+            "low": [0.5, 0.5, 2.0],
+            "close": [1.5, 0.8, 3.5],
+            "volume": [100, 200, 300],
+        },
+        index=dates,
+    )
+    pipeline = FeaturePipeline(Returns())
+    with pytest.raises(ValueError, match="Non-positive values"):
+        pipeline.transform(df)
+
+
+def test_pipeline_rejects_negative_price():
+    """Pipeline must reject a DataFrame with negative prices."""
+    dates = pd.date_range("2023-01-02", periods=3, freq="B")
+    df = pd.DataFrame(
+        {
+            "open": [1.0, 2.0, 3.0],
+            "high": [2.0, 3.0, 4.0],
+            "low": [0.5, -1.0, 2.0],
+            "close": [1.5, 2.5, 3.5],
+            "volume": [100, 200, 300],
+        },
+        index=dates,
+    )
+    pipeline = FeaturePipeline(Returns())
+    with pytest.raises(ValueError, match="Non-positive values"):
+        pipeline.transform(df)
+
+
+# ---------------------------------------------------------------------------
 # min_periods (Item 4)
 # ---------------------------------------------------------------------------
 
