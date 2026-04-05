@@ -1,0 +1,65 @@
+name: Feature / Indicator Request
+description: Request a new feature, indicator, or enhancement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement to finfeatures!
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What kind of feature are you requesting?
+      options:
+        - New indicator (momentum, trend, volatility, volume, etc.)
+        - Enhancement to an existing indicator or feature
+        - New data source
+        - Pipeline / core improvement
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: indicator-name
+    attributes:
+      label: Indicator / feature name
+      description: If requesting a specific indicator, what is it called?
+      placeholder: e.g. Average Directional Index (ADX)
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the feature and why it would be useful.
+      placeholder: |
+        What does this indicator measure?
+        What trading / analysis use case does it support?
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links to documentation, papers, or implementations that describe the calculation.
+      placeholder: |
+        - https://www.investopedia.com/terms/a/adx.asp
+        - TA-Lib function name: ADX
+    validations:
+      required: false
+
+  - type: textarea
+    id: api-sketch
+    attributes:
+      label: Suggested API (optional)
+      description: If you have thoughts on how the feature should look in code, sketch it here.
+      render: python
+      placeholder: |
+        from finfeatures.features.trend import ADX
+        pipeline = standard_pipeline().add(ADX(window=14))
+    validations:
+      required: false

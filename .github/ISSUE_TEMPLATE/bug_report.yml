@@ -1,0 +1,73 @@
+name: Bug Report
+description: Report incorrect output, a crash, or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue. Please fill in enough detail so we can reproduce the problem.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear summary of what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal code or steps that trigger the bug.
+      render: python
+      placeholder: |
+        import pandas as pd
+        from finfeatures import standard_pipeline
+
+        raw = pd.read_csv("data.csv", index_col="date", parse_dates=True)
+        enriched = standard_pipeline().transform(raw)
+        # describe what goes wrong
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened (include tracebacks, wrong values, etc.).
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: finfeatures version
+      placeholder: e.g. 0.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: e.g. 3.12.3
+    validations:
+      required: true
+
+  - type: input
+    id: talib
+    attributes:
+      label: TA-Lib installed?
+      description: "Output of: python -c \"import talib; print(talib.__version__)\" (or 'no')"
+      placeholder: e.g. 0.6.0 or no
+    validations:
+      required: false
